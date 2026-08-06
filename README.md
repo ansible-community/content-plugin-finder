@@ -15,6 +15,47 @@ This project vendors [ansible-content-capture](https://github.com/ansible/ansibl
 
 Vendored note: `loader.get_scanner_version()` was patched to use `importlib.metadata` instead of removed `pkg_resources` (setuptools ≥83).
 
+## Visualizer
+
+A zero-build dual-mode graph UI lives in [`viz/`](viz/) (d3 v7 from CDN).
+
+![Impact view: changed file → plugin FQCNs → molecule scenarios and integration targets](docs/images/visualizer-impact.png)
+
+### 1. Export JSON
+
+From a collection checkout:
+
+```bash
+# Plugin dependency DAG (full graph, or focus one FQCN)
+content-plugin-finder --collection-graph . --format json > graph.json
+content-plugin-finder --collection-graph . --plugin ansible.platform.application --format json > plugin.json
+
+# Impact flow (needs a git base, or pipe paths)
+content-plugin-finder --impact . --base origin/main --format json > impact.json
+echo 'plugins/action/base_action.py' \
+  | content-plugin-finder --impact . --from-stdin --format json > impact.json
+```
+
+### 2. Open the UI
+
+```bash
+# optional: from the repo root
+xdg-open viz/index.html   # or open viz/index.html in your browser
+```
+
+1. Open [`viz/index.html`](viz/index.html) (double-click or `file://` is fine).
+2. Click **Choose File** / **Load JSON** and select `graph.json` or `impact.json`.
+3. Mode is auto-detected from the JSON shape; you can override with the **Mode** control.
+4. **Plugin dependencies**: pick a **Focus plugin** FQCN (recommended). Click a node for path + owning plugins.
+5. **Impact**: explore changed files → plugins → molecule / integration roots. Counts appear in the toolbar.
+
+| Mode | JSON source | View |
+|------|-------------|------|
+| Plugin dependencies | `--collection-graph --format json` (full or `--plugin FQCN`) | Focus one FQCN (recommended) or capped “All”; nodes are Python files |
+| Impact | `--impact --format json` | Changed files → plugin FQCNs → molecule / integration roots |
+
+No npm build. The file picker works with `file://` (browsers block `fetch` of local paths).
+
 ## Install
 
 ```bash

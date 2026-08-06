@@ -15,3 +15,6 @@ htmlcov/
 /tmp/
 *.swp
 .DS_Store
+# local viz data dumps
+/graph.json
+/impact.json

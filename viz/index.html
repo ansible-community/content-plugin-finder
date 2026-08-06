@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>content-plugin-finder visualizer</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="brand">
+        <strong>content-plugin-finder</strong>
+        <span class="badge">unsupported prototype</span>
+      </div>
+      <label class="field">
+        Mode
+        <select id="mode">
+          <option value="plugin">Plugin dependencies</option>
+          <option value="impact">Impact</option>
+        </select>
+      </label>
+      <label class="field file-field">
+        Load JSON
+        <input type="file" id="file" accept="application/json,.json" />
+      </label>
+      <label class="field plugin-only">
+        Focus plugin
+        <select id="focus">
+          <option value="">— load graph JSON —</option>
+        </select>
+      </label>
+      <label class="field plugin-only">
+        Search
+        <input type="search" id="search" placeholder="filter nodes…" />
+      </label>
+      <div id="counts" class="counts impact-only" hidden></div>
+      <p id="hint" class="hint">
+        Load collection-graph JSON
+        (<code>content-plugin-finder --collection-graph . --format json &gt; graph.json</code>)
+        or impact JSON
+        (<code>--impact . --base REF --format json &gt; impact.json</code>).
+      </p>
+    </header>
+    <main class="main">
+      <svg id="canvas"></svg>
+      <aside id="detail" class="detail">
+        <h2>Detail</h2>
+        <p class="muted">Click a node.</p>
+        <pre id="detail-body"></pre>
+      </aside>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
