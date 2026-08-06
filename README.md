@@ -112,6 +112,69 @@ git changed files
                 └─ content index → molecule scenarios / integration targets
 ```
 
+### Running Molecule or ansible-test from the list
+
+Emit leaf names, then drive the tools your collection already uses:
+
+```bash
+content-plugin-finder --impact . --base origin/main \
+  --emit molecule --names-only > molecule.txt
+content-plugin-finder --impact . --base origin/main \
+  --emit integration --names-only > integration.txt
+```
+
+**Molecule** (scenario name = directory under `extensions/molecule/` or `molecule/`):
+
+```bash
+while read -r scenario; do
+  [ -n "$scenario" ] || continue
+  molecule test -s "$scenario"
+done < molecule.txt
+```
+
+**ansible-test integration** (target name = directory under `tests/integration/targets/`):
+
+```bash
+mapfile -t targets < integration.txt
+if ((${#targets[@]})); then
+  ansible-test integration --docker default "${targets[@]}"
+fi
+```
+
+Adjust Molecule/ansible-test flags to match your collection CI. An empty file means nothing to run for that kind.
+
+Minimal PR CI sketch (fetch full history or the base SHA first):
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+
+- name: Select tests
+  run: |
+    content-plugin-finder --impact . \
+      --base "${{ github.event.pull_request.base.sha }}" \
+      --head "${{ github.sha }}" \
+      --emit molecule --names-only | tee molecule.txt
+    content-plugin-finder --impact . \
+      --base "${{ github.event.pull_request.base.sha }}" \
+      --head "${{ github.sha }}" \
+      --emit integration --names-only | tee integration.txt
+
+- name: Molecule
+  run: |
+    while read -r s; do
+      [ -n "$s" ] || continue
+      molecule test -s "$s"
+    done < molecule.txt
+
+- name: ansible-test
+  run: |
+    mapfile -t t < integration.txt
+    ((${#t[@]})) || exit 0
+    ansible-test integration --docker default "${t[@]}"
+```
+
 ## Library
 
 ```python
