@@ -15,11 +15,17 @@ This project vendors [ansible-content-capture](https://github.com/ansible/ansibl
 
 Vendored note: `loader.get_scanner_version()` was patched to use `importlib.metadata` instead of removed `pkg_resources` (setuptools ≥83).
 
+![Impact view: changed file → plugin FQCNs → molecule scenarios and integration targets](docs/images/visualizer-impact.png)
+
+## Install
+
+```bash
+pip install -e ".[dev]"
+```
+
 ## Visualizer
 
 A zero-build dual-mode graph UI lives in [`viz/`](viz/) (d3 v7 from CDN).
-
-![Impact view: changed file → plugin FQCNs → molecule scenarios and integration targets](docs/images/visualizer-impact.png)
 
 ### 1. Export JSON
 
@@ -55,12 +61,6 @@ xdg-open viz/index.html   # or open viz/index.html in your browser
 | Impact | `--impact --format json` | Changed files → plugin FQCNs → molecule / integration roots |
 
 No npm build. The file picker works with `file://` (browsers block `fetch` of local paths).
-
-## Install
-
-```bash
-pip install -e ".[dev]"
-```
 
 ## Usage
 
