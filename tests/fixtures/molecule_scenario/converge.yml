@@ -1,0 +1,18 @@
+---
+- name: Converge
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Create a container
+      community.docker.docker_container:
+        name: example
+        image: "{{ 'alpine' | default('alpine:latest') }}"
+        state: started
+
+    - name: Read a file via lookup
+      ansible.builtin.debug:
+        msg: "{{ lookup('file', '/etc/hosts') }}"
+
+    - name: Query env
+      ansible.builtin.set_fact:
+        home: "{{ query('env', 'HOME') }}"

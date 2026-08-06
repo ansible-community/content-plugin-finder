@@ -1,0 +1,13 @@
+---
+- name: Gather something
+  ansible.builtin.set_fact:
+    value: "{{ 'hello' | upper | trim }}"
+
+- name: Use password lookup
+  ansible.builtin.debug:
+    msg: "{{ lookup('ansible.builtin.password', '/dev/null length=8') }}"
+
+- name: Call collection module
+  amazon.aws.ec2_instance_info:
+    filters:
+      instance-state-name: running

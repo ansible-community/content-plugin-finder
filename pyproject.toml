@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "content-plugin-finder"
+version = "0.1.0"
+description = "Find Ansible modules, filters, and lookups used in scenario/target directories"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Ansible Community" }]
+dependencies = [
+  "PyYAML",
+  "ruamel.yaml",
+  "jsonpickle",
+  "joblib",
+  "requests",
+  "filelock",
+  "rapidfuzz",
+  "tabulate",
+  "gitdb",
+  "smmap",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+]
+
+[project.scripts]
+content-plugin-finder = "content_plugin_finder.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ansible_content_capture = [
+  "*.json",
+  "*.txt",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

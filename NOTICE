@@ -1,0 +1,9 @@
+content-plugin-finder
+Copyright (c) 2026 Ansible Community
+
+Licensed under the MIT License. See LICENSE.
+
+This product includes software from ansible-content-capture
+(https://github.com/ansible/ansible-content-capture), licensed under
+the Apache License, Version 2.0. See LICENSE.ansible-content-capture.
+The vendored copy lives under src/ansible_content_capture/.
