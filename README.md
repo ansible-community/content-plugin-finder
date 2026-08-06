@@ -125,12 +125,30 @@ content-plugin-finder --impact . --base origin/main \
 
 **Molecule** (scenario name = directory under `extensions/molecule/` or `molecule/`):
 
+Serial (one scenario at a time):
+
 ```bash
 while read -r scenario; do
   [ -n "$scenario" ] || continue
   molecule test -s "$scenario"
 done < molecule.txt
 ```
+
+With Molecule **workers** (experimental concurrent scenarios; multiple `-s` + `--workers`):
+
+```bash
+args=()
+while read -r scenario; do
+  [ -n "$scenario" ] || continue
+  args+=(-s "$scenario")
+done < molecule.txt
+
+((${#args[@]})) || exit 0
+molecule test "${args[@]}" --workers cpus-1
+# optional: --continue-on-error
+```
+
+`--workers` accepts an integer, `cpus`, or `cpus-1`. Prefer this over a serial loop when the collection supports shared-state / ansible-native multi-scenario runs. See Molecule’s docs for `--workers` / `--shared-state` behavior (default scenario create/destroy stays on the main process).
 
 **ansible-test integration** (target name = directory under `tests/integration/targets/`):
 
@@ -163,10 +181,13 @@ Minimal PR CI sketch (fetch full history or the base SHA first):
 
 - name: Molecule
   run: |
+    args=()
     while read -r s; do
       [ -n "$s" ] || continue
-      molecule test -s "$s"
+      args+=(-s "$s")
     done < molecule.txt
+    ((${#args[@]})) || exit 0
+    molecule test "${args[@]}" --workers cpus-1
 
 - name: ansible-test
   run: |
