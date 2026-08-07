@@ -148,10 +148,18 @@ In CI, pass the PR **base SHA** (or fetch the target branch). Bare `git diff` wi
 git changed files
         │
         ├─ under scenario/target     → that root
+        │     (path layout works even if discovery depth missed the root)
+        ├─ shared molecule file      → all discovered molecule scenarios
+        │     (e.g. extensions/molecule/requirements.yml)
         └─ collection .py            → file_to_plugins → FQCNs
                 │
                 └─ content index → molecule scenarios / integration targets
 ```
+
+Direct path matches cover scenario and integration-target edits themselves, not only
+plugin→content reverse mapping. Shared files under a `molecule/` directory (outside
+any scenario) select every discovered molecule scenario. Deleted paths are included
+in the git diff (`ACMRD`).
 
 ### Running Molecule or ansible-test from the list
 

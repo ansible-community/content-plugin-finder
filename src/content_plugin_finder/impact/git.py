@@ -18,9 +18,9 @@ def list_changed_files(
     """
     repo = repo.resolve()
     if merge_base:
-        args = ["git", "diff", "--name-only", "--diff-filter=ACMR", f"{base}...{head}"]
+        args = ["git", "diff", "--name-only", "--diff-filter=ACMRD", f"{base}...{head}"]
     else:
-        args = ["git", "diff", "--name-only", "--diff-filter=ACMR", base, head]
+        args = ["git", "diff", "--name-only", "--diff-filter=ACMRD", base, head]
 
     try:
         out = subprocess.check_output(args, cwd=repo, stderr=subprocess.PIPE, text=True)

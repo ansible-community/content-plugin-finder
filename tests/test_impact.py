@@ -104,6 +104,66 @@ def test_impact_direct_scenario_edit(tmp_path: Path):
     assert report.integration_targets == []
 
 
+def test_impact_direct_integration_edit(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    report = compute_impact(
+        collection_root=root,
+        changed_files=["tests/integration/targets/thing_test/tasks/main.yml"],
+        parent=root,
+    )
+    assert report.integration_targets == ["tests/integration/targets/thing_test"]
+    assert report.molecule_scenarios == []
+
+
+def test_impact_path_prefix_when_depth_too_low(tmp_path: Path):
+    """Scenario/target edits still map via path layout when discovery finds nothing."""
+    root = _mini_collection(tmp_path)
+    report = compute_impact(
+        collection_root=root,
+        changed_files=[
+            "extensions/molecule/thing_mock/converge.yml",
+            "tests/integration/targets/thing_test/tasks/main.yml",
+        ],
+        parent=root,
+        depth=0,
+    )
+    assert report.molecule_scenarios == ["extensions/molecule/thing_mock"]
+    assert report.integration_targets == ["tests/integration/targets/thing_test"]
+
+
+def test_impact_shared_molecule_selects_all_scenarios(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    (root / "extensions" / "molecule" / "requirements.yml").write_text(
+        "collections: []\n",
+        encoding="utf-8",
+    )
+    report = compute_impact(
+        collection_root=root,
+        changed_files=["extensions/molecule/requirements.yml"],
+        parent=root,
+    )
+    assert set(report.molecule_scenarios) == {
+        "extensions/molecule/thing_mock",
+        "extensions/molecule/other",
+    }
+    assert report.integration_targets == []
+    for root_rel in report.molecule_scenarios:
+        assert any(
+            r.endswith("(shared molecule)") for r in report.reasons[root_rel]
+        )
+
+
+def test_impact_scenario_local_still_only_that_scenario(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    report = compute_impact(
+        collection_root=root,
+        changed_files=["extensions/molecule/other/converge.yml"],
+        parent=root,
+    )
+    assert report.molecule_scenarios == ["extensions/molecule/other"]
+    assert "extensions/molecule/thing_mock" not in report.molecule_scenarios
+
+
 def test_format_impact_text_names_only(tmp_path: Path):
     root = _mini_collection(tmp_path)
     report = compute_impact(

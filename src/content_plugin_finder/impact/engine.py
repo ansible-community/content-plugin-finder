@@ -10,6 +10,7 @@ from content_plugin_finder.discover import discover_scan_roots
 from content_plugin_finder.impact.content_index import (
     ContentIndex,
     build_content_index,
+    classify_root,
     roots_using_plugins,
 )
 from content_plugin_finder.models import PluginKind
@@ -61,6 +62,75 @@ def _root_containing_file(
     return best
 
 
+def _ensure_root(
+    content_index: ContentIndex,
+    parent: Path,
+    rel_root: str,
+    kind: str,
+) -> None:
+    """Register a scan root (discovered or path-prefix synthetic) on the index."""
+    abs_root = str((parent / rel_root).resolve())
+    content_index.roots[abs_root] = rel_root
+    content_index.root_kinds.setdefault(rel_root, kind)
+
+
+def _molecule_roots_from_index(content_index: ContentIndex) -> list[str]:
+    return sorted(
+        root for root, kind in content_index.root_kinds.items() if kind == "molecule"
+    )
+
+
+def _path_prefix_hits(
+    changed: str,
+    content_index: ContentIndex,
+) -> list[tuple[str, str, str]]:
+    """Resolve molecule/integration roots from path layout alone.
+
+    Returns list of ``(root_relpath, kind, reason)``.
+
+    - ``…/molecule/<scenario>/…`` → that scenario
+    - ``…/molecule/<shared-file>`` or ``…/molecule/.<dir>/…`` → all discovered
+      molecule scenarios (shared molecule config)
+    - ``…/tests/integration/targets/<target>/…`` → that target
+    """
+    parts = changed.split("/")
+    hits: list[tuple[str, str, str]] = []
+
+    # Integration: …/tests/integration/targets/<target>/…
+    for i in range(len(parts) - 3):
+        if parts[i : i + 3] != ["tests", "integration", "targets"]:
+            continue
+        if i + 3 >= len(parts):
+            break
+        target = parts[i + 3]
+        if not target or target.startswith("."):
+            break
+        rel_root = "/".join(parts[: i + 4])
+        hits.append((rel_root, "integration", f"changed:{changed}"))
+        return hits
+
+    # Molecule: …/molecule/<scenario|shared>/…
+    if "molecule" not in parts:
+        return hits
+    mi = parts.index("molecule")
+    rest = parts[mi + 1 :]
+    if not rest:
+        return hits
+
+    # Shared: file directly under molecule/, or a dot-dir sibling (e.g. .config)
+    shared = len(rest) == 1 or rest[0].startswith(".")
+    if shared:
+        reason = f"changed:{changed} (shared molecule)"
+        for rel_root in _molecule_roots_from_index(content_index):
+            hits.append((rel_root, "molecule", reason))
+        return hits
+
+    # Scenario-local: molecule/<scenario>/…
+    rel_root = "/".join(parts[: mi + 2])
+    hits.append((rel_root, "molecule", f"changed:{changed}"))
+    return hits
+
+
 def compute_impact(
     *,
     collection_root: Path,
@@ -86,16 +156,26 @@ def compute_impact(
         for root in discover_scan_roots(parent, depth):
             rel = str(root.resolve().relative_to(parent))
             content_index.roots[str(root.resolve())] = rel
+            if rel not in content_index.root_kinds:
+                content_index.root_kinds[rel] = classify_root(root, parent)
 
     reasons: dict[str, list[str]] = defaultdict(list)
     affected_plugins: set[str] = set()
     normalized_files = [_normalize_rel(f) for f in changed_files]
 
     for changed in normalized_files:
-        # 1) Direct edit inside a scenario / target
+        # 1) Direct edit inside a discovered scenario / target
         direct_root = _root_containing_file(changed, content_index.roots, parent)
         if direct_root is not None:
-            reasons[direct_root].append(f"changed:{changed}")
+            reason = f"changed:{changed}"
+            if reason not in reasons[direct_root]:
+                reasons[direct_root].append(reason)
+        else:
+            # 1b) Path-prefix fallback (and shared molecule → all molecule roots)
+            for rel_root, kind, reason in _path_prefix_hits(changed, content_index):
+                _ensure_root(content_index, parent, rel_root, kind)
+                if reason not in reasons[rel_root]:
+                    reasons[rel_root].append(reason)
 
         # 2) Collection Python / plugin file → plugins → content roots
         plugins = graph.plugins_for_file(changed)

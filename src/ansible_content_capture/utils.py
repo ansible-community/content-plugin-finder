@@ -548,7 +548,11 @@ def recursive_copy_dict(src, dst):
 
 
 def is_test_object(path: str):
-    return path.startswith("tests/integration/") or path.startswith("molecule/")
+    return (
+        path.startswith("tests/integration/")
+        or path.startswith("molecule/")
+        or path.startswith("extensions/molecule/")
+    )
 
 
 def get_dir_size(path=""):
