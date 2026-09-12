@@ -56,6 +56,10 @@
       if (!data.file_to_plugins) data.file_to_plugins = {};
       return data;
     }
+    if (data && Array.isArray(data.molecule_scenarios) && Array.isArray(data.affected_plugins)) {
+      if (!Array.isArray(data.affected_roles)) data.affected_roles = [];
+      return data;
+    }
     // Single --plugin resolution object → wrap as mini graph
     if (data && data.name && Array.isArray(data.entry_files) && Array.isArray(data.depends_on_files)) {
       const file_to_plugins = {};
@@ -307,7 +311,8 @@
 
     function ensure(id, type, label) {
       if (!nodeMap.has(id)) {
-        nodeMap.set(id, { id, type, label: label || leaf(id), r: type === "plugin" ? 8 : 7 });
+        const middle = type === "plugin" || type === "role";
+        nodeMap.set(id, { id, type, label: label || leaf(id), r: middle ? 8 : 7 });
       }
       return nodeMap.get(id);
     }
@@ -317,6 +322,9 @@
     }
     for (const p of data.affected_plugins || []) {
       ensure(`plugin:${p}`, "plugin", p);
+    }
+    for (const role of data.affected_roles || []) {
+      ensure(`role:${role}`, "role", role);
     }
     for (const m of data.molecule_scenarios || []) {
       ensure(`root:${m}`, "molecule", leaf(m));
@@ -350,30 +358,36 @@
           const fid = `file:${path}`;
           ensure(fid, "file", leaf(path));
           edge(fid, rootId);
-        } else if (reason.startsWith("plugin:")) {
-          // plugin:FQCN via path
-          const rest = reason.slice("plugin:".length);
+        } else if (reason.startsWith("plugin:") || reason.startsWith("role:")) {
+          const type = reason.startsWith("plugin:") ? "plugin" : "role";
+          const rest = reason.slice(`${type}:`.length);
           const viaIdx = rest.lastIndexOf(" via ");
           if (viaIdx === -1) continue;
-          const plugin = rest.slice(0, viaIdx);
+          const name = rest.slice(0, viaIdx);
           const path = rest.slice(viaIdx + 5);
-          const pid = `plugin:${plugin}`;
+          const contentId = `${type}:${name}`;
           const fid = `file:${path}`;
-          ensure(pid, "plugin", plugin);
+          ensure(contentId, type, name);
           ensure(fid, "file", leaf(path));
-          edge(fid, pid);
-          edge(pid, rootId);
+          edge(fid, contentId);
+          edge(contentId, rootId);
         }
       }
     }
 
     const width = el.canvas.clientWidth || 900;
     const height = el.canvas.clientHeight || 600;
-    const colX = { file: width * 0.18, plugin: width * 0.5, molecule: width * 0.82, integration: width * 0.82 };
+    const colX = {
+      file: width * 0.18,
+      plugin: width * 0.5,
+      role: width * 0.5,
+      molecule: width * 0.82,
+      integration: width * 0.82,
+    };
 
     const nodes = [...nodeMap.values()];
     // Pre-position by column for layered feel; force will refine
-    const buckets = { file: [], plugin: [], molecule: [], integration: [] };
+    const buckets = { file: [], plugin: [], role: [], molecule: [], integration: [] };
     for (const n of nodes) {
       (buckets[n.type] || buckets.file).push(n);
     }
@@ -391,15 +405,17 @@
       colorFn: (d) => {
         if (d.type === "file") return "var(--file)";
         if (d.type === "plugin") return "var(--plugin)";
+        if (d.type === "role") return "var(--role)";
         if (d.type === "molecule") return "var(--molecule)";
         return "var(--integration)";
       },
       onClick: (d) => {
-        showDetail(`type: ${d.type}\nid: ${d.id.replace(/^(file|plugin|root):/, "")}\nlabel: ${d.label}`);
+        showDetail(`type: ${d.type}\nid: ${d.id.replace(/^(file|plugin|role|root):/, "")}\nlabel: ${d.label}`);
       },
       legend: [
         ["var(--file)", "changed file"],
         ["var(--plugin)", "plugin FQCN"],
+        ["var(--role)", "role FQCN"],
         ["var(--molecule)", "molecule scenario"],
         ["var(--integration)", "integration target"],
       ],
@@ -425,6 +441,7 @@
     el.counts.innerHTML =
       `<strong>files</strong>${(data.changed_files || []).length} ` +
       `<strong>plugins</strong>${(data.affected_plugins || []).length} ` +
+      `<strong>roles</strong>${(data.affected_roles || []).length} ` +
       `<strong>molecule</strong>${(data.molecule_scenarios || []).length} ` +
       `<strong>integration</strong>${(data.integration_targets || []).length}`;
   }
