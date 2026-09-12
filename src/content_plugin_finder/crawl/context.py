@@ -38,7 +38,9 @@ def iter_yaml_files(root: Path) -> list[Path]:
     return files
 
 
-def _walk_scalars(node: Any, path: Path, out: list[YamlScalar], line: int | None = None) -> None:
+def _walk_scalars(
+    node: Any, path: Path, out: list[YamlScalar], line: int | None = None
+) -> None:
     if isinstance(node, str):
         if node.strip():
             out.append(YamlScalar(path=path, line=line, text=node))
@@ -76,14 +78,14 @@ def build_acc_result(root: Path) -> tuple[Any | None, list[str]]:
     errors: list[str] = []
     try:
         from ansible_content_capture.scanner import AnsibleScanner
-    except Exception as exc:  # pragma: no cover - import failure is environmental
+    except Exception as exc:  # noqa: BLE001  # import failure is environmental
         return None, [f"failed to import ansible_content_capture: {exc}"]
 
     try:
         scanner = AnsibleScanner()
         result = scanner.run(target_dir=str(root.resolve()))
         return result, errors
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001  # scanner failures become crawl errors
         return None, [f"ansible-content-capture scan failed for {root}: {exc}"]
 
 

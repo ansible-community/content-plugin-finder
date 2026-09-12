@@ -5,7 +5,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from content_plugin_finder.collection.graph import CollectionGraph, build_collection_graph
+from content_plugin_finder.collection.graph import (
+    CollectionGraph,
+    build_collection_graph,
+)
 from content_plugin_finder.discover import discover_scan_roots
 from content_plugin_finder.impact.content_index import (
     ContentIndex,
@@ -182,7 +185,9 @@ def compute_impact(
         for plugin in plugins:
             affected_plugins.add(plugin)
         if plugins:
-            for root, matched in roots_using_plugins(content_index, set(plugins)).items():
+            for root, matched in roots_using_plugins(
+                content_index, set(plugins)
+            ).items():
                 for plugin in matched:
                     reason = f"plugin:{plugin} via {changed}"
                     if reason not in reasons[root]:

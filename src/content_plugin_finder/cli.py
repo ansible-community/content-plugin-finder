@@ -18,7 +18,10 @@ from content_plugin_finder.impact.engine import (
     format_impact_json,
     format_impact_text,
 )
-from content_plugin_finder.impact.git import list_changed_files, read_changed_files_from_lines
+from content_plugin_finder.impact.git import (
+    list_changed_files,
+    read_changed_files_from_lines,
+)
 from content_plugin_finder.models import PluginKind
 from content_plugin_finder.report import format_json, format_text
 

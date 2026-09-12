@@ -111,6 +111,7 @@ class ScanReport:
         }
         if by_directory:
             data["directories"] = {
-                path: report.to_dict() for path, report in sorted(self.directories.items())
+                path: report.to_dict()
+                for path, report in sorted(self.directories.items())
             }
         return data

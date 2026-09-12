@@ -43,7 +43,9 @@ class Orchestrator:
 
             # Keep only requested kinds (crawler may emit subset)
             findings = [f for f in findings if f.kind in kind_set]
-            report.directories[str(root.resolve())] = self._to_directory_report(root, findings)
+            report.directories[str(root.resolve())] = self._to_directory_report(
+                root, findings
+            )
         return report
 
     @staticmethod

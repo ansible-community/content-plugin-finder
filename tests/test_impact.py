@@ -41,10 +41,7 @@ def _mini_collection(tmp_path: Path) -> Path:
     mol.mkdir(parents=True)
     (mol / "molecule.yml").write_text("driver:\n  name: default\n", encoding="utf-8")
     (mol / "converge.yml").write_text(
-        "- hosts: localhost\n"
-        "  tasks:\n"
-        "    - acme.widgets.thing:\n"
-        "        name: x\n",
+        "- hosts: localhost\n  tasks:\n    - acme.widgets.thing:\n        name: x\n",
         encoding="utf-8",
     )
 
@@ -148,9 +145,7 @@ def test_impact_shared_molecule_selects_all_scenarios(tmp_path: Path):
     }
     assert report.integration_targets == []
     for root_rel in report.molecule_scenarios:
-        assert any(
-            r.endswith("(shared molecule)") for r in report.reasons[root_rel]
-        )
+        assert any(r.endswith("(shared molecule)") for r in report.reasons[root_rel])
 
 
 def test_impact_scenario_local_still_only_that_scenario(tmp_path: Path):
