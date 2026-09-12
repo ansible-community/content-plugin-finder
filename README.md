@@ -142,6 +142,30 @@ molecule	extensions/molecule/application_mock
 integration	tests/integration/targets/applications_test
 ```
 
+In JSON mode, the impact report includes stable affected-content fields:
+
+```json
+{
+  "collection": "acme.widgets",
+  "changed_files": ["roles/agent/tasks/main.yml"],
+  "affected_plugins": [],
+  "affected_roles": ["acme.widgets.agent"],
+  "molecule_scenarios": ["extensions/molecule/thing_mock"],
+  "integration_targets": ["tests/integration/targets/thing_test"],
+  "reasons": {
+    "extensions/molecule/thing_mock": [
+      "role:acme.widgets.agent via roles/agent/tasks/main.yml"
+    ],
+    "tests/integration/targets/thing_test": [
+      "role:acme.widgets.agent via roles/agent/tasks/main.yml"
+    ]
+  }
+}
+```
+
+`affected_plugins` and `affected_roles` are always present. Each uses an empty
+list when its content type is unaffected.
+
 In CI, pass the PR **base SHA** (or fetch the target branch). Bare `git diff` without a base is not reliable on shallow/detached checkouts. Three-dot `base...head` is the default; use `--two-dot` for `base head`.
 
 ```text
@@ -151,10 +175,25 @@ git changed files
         │     (path layout works even if discovery depth missed the root)
         ├─ shared molecule file      → all discovered molecule scenarios
         │     (e.g. extensions/molecule/requirements.yml)
-        └─ collection .py            → file_to_plugins → FQCNs
+        ├─ roles/<role>/...          → local role FQCN
+        │       │
+        │       └─ role index → molecule scenarios / integration targets
+        └─ collection .py            → file_to_plugins → plugin FQCNs
                 │
                 └─ content index → molecule scenarios / integration targets
 ```
+
+A changed path below `roles/<role_name>/` affects the local role
+`<namespace>.<collection>.<role_name>`, using the collection identity from
+`galaxy.yml`. Every discovered Molecule scenario or ansible-test integration
+target that references that role is selected. The match is conservative: any
+file owned by the role selects every root that uses the role.
+
+Role indexing supports string and mapping entries under play-level `roles:`,
+plus short and `ansible.builtin` forms of `include_role` and `import_role`.
+Short role names resolve against the local collection. Literal
+`import_playbook`, `import_tasks`, and `include_tasks` paths are followed while
+they remain below `--parent`; dynamic Jinja import paths are not evaluated.
 
 Direct path matches cover scenario and integration-target edits themselves, not only
 plugin→content reverse mapping. Shared files under a `molecule/` directory (outside
@@ -265,4 +304,6 @@ impact = compute_impact(
 )
 print(impact.molecule_scenarios)
 print(impact.integration_targets)
+print(impact.affected_plugins)
+print(impact.affected_roles)
 ```
