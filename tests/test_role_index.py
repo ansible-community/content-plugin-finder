@@ -126,3 +126,21 @@ def test_roles_used_by_root_skips_invalid_and_missing_yaml(tmp_path: Path):
         parent=tmp_path,
         collection="acme.widgets",
     ) == {"acme.widgets.agent"}
+
+
+def test_roles_used_by_root_skips_invalid_utf8_and_keeps_valid_roles(
+    tmp_path: Path,
+):
+    root = tmp_path / "molecule" / "default"
+    root.mkdir(parents=True)
+    (root / "invalid.yml").write_bytes(b"- hosts: localhost\n  roles: \xff\n")
+    (root / "valid.yml").write_text(
+        "- include_role:\n    name: agent\n",
+        encoding="utf-8",
+    )
+
+    assert roles_used_by_root(
+        root,
+        parent=tmp_path,
+        collection="acme.widgets",
+    ) == {"acme.widgets.agent"}

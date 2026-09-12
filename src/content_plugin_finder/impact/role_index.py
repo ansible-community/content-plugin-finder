@@ -123,7 +123,7 @@ def roles_used_by_root(
         visited.add(path)
         try:
             documents = list(yaml.safe_load_all(path.read_text(encoding="utf-8")))
-        except (OSError, yaml.YAMLError):
+        except (OSError, UnicodeError, yaml.YAMLError):
             continue
 
         for document in documents:
