@@ -6,6 +6,7 @@ from pathlib import Path
 
 from content_plugin_finder.crawl.orchestrator import Orchestrator
 from content_plugin_finder.discover import discover_scan_roots
+from content_plugin_finder.impact.role_index import roles_used_by_root
 from content_plugin_finder.models import PluginKind
 
 
@@ -18,6 +19,8 @@ class ContentIndex:
     plugin_to_roots: dict[str, list[str]] = field(default_factory=dict)
     # root relpath -> root kind
     root_kinds: dict[str, str] = field(default_factory=dict)
+    # role FQCN -> root relpaths
+    role_to_roots: dict[str, list[str]] = field(default_factory=dict)
     # absolute root path -> relpath
     roots: dict[str, str] = field(default_factory=dict)
 
@@ -52,6 +55,7 @@ def build_content_index(
 
     index = ContentIndex(collection=collection)
     plugin_to_roots: dict[str, set[str]] = defaultdict(set)
+    role_to_roots: dict[str, set[str]] = defaultdict(set)
 
     for abs_dir, dir_report in report.directories.items():
         root = Path(abs_dir)
@@ -60,7 +64,15 @@ def build_content_index(
         except ValueError:
             rel = str(root)
         index.roots[str(root.resolve())] = rel
-        index.root_kinds[rel] = classify_root(root, parent)
+        kind = classify_root(root, parent)
+        index.root_kinds[rel] = kind
+        if kind in {"molecule", "integration"}:
+            for role in roles_used_by_root(
+                root,
+                parent=parent,
+                collection=collection,
+            ):
+                role_to_roots[role].add(rel)
 
         names: list[str] = []
         for group in (dir_report.modules, dir_report.filters, dir_report.lookups):
@@ -76,6 +88,9 @@ def build_content_index(
                 plugin_to_roots[short].add(rel)
 
     index.plugin_to_roots = {k: sorted(v) for k, v in sorted(plugin_to_roots.items())}
+    index.role_to_roots = {
+        role: sorted(roots) for role, roots in sorted(role_to_roots.items())
+    }
     return index
 
 
@@ -97,3 +112,12 @@ def roots_using_plugins(index: ContentIndex, plugins: set[str]) -> dict[str, lis
                 if plugin not in hits[root]:
                     hits[root].append(plugin)
     return {k: sorted(set(v)) for k, v in sorted(hits.items())}
+
+
+def roots_using_roles(index: ContentIndex, roles: set[str]) -> dict[str, list[str]]:
+    """Return root relpath to matching normalized role FQCNs."""
+    hits: dict[str, set[str]] = defaultdict(set)
+    for role in roles:
+        for root in index.role_to_roots.get(role, []):
+            hits[root].add(role)
+    return {root: sorted(found) for root, found in sorted(hits.items())}

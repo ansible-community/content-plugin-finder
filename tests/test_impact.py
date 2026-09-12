@@ -2,7 +2,7 @@ from pathlib import Path
 
 from content_plugin_finder.cli import main
 from content_plugin_finder.collection.graph import build_collection_graph
-from content_plugin_finder.impact.content_index import build_content_index
+from content_plugin_finder.impact.content_index import build_content_index, roots_using_roles
 from content_plugin_finder.impact.engine import compute_impact, format_impact_text
 from content_plugin_finder.impact.git import read_changed_files_from_lines
 
@@ -40,8 +40,16 @@ def _mini_collection(tmp_path: Path) -> Path:
     mol = tmp_path / "extensions" / "molecule" / "thing_mock"
     mol.mkdir(parents=True)
     (mol / "molecule.yml").write_text("driver:\n  name: default\n", encoding="utf-8")
+    role = tmp_path / "roles" / "agent" / "tasks"
+    role.mkdir(parents=True)
+    (role / "main.yml").write_text(
+        "- ansible.builtin.debug:\n    msg: agent\n",
+        encoding="utf-8",
+    )
     (mol / "converge.yml").write_text(
         "- hosts: localhost\n"
+        "  roles:\n"
+        "    - role: acme.widgets.agent\n"
         "  tasks:\n"
         "    - acme.widgets.thing:\n"
         "        name: x\n",
@@ -54,7 +62,13 @@ def _mini_collection(tmp_path: Path) -> Path:
     (target / "aliases").write_text("thing\n", encoding="utf-8")
     (target / "tasks").mkdir()
     (target / "tasks" / "main.yml").write_text(
-        "- acme.widgets.thing:\n    name: y\n",
+        "- acme.widgets.thing:\n    name: y\n"
+        "- ansible.builtin.import_tasks: role.yml\n",
+        encoding="utf-8",
+    )
+    (target / "tasks" / "role.yml").write_text(
+        "- ansible.builtin.include_role:\n"
+        "    name: agent\n",
         encoding="utf-8",
     )
 
@@ -63,7 +77,12 @@ def _mini_collection(tmp_path: Path) -> Path:
     other.mkdir(parents=True)
     (other / "molecule.yml").write_text("driver:\n  name: default\n", encoding="utf-8")
     (other / "converge.yml").write_text(
-        "- hosts: localhost\n  tasks:\n    - ansible.builtin.debug:\n        msg: hi\n",
+        "- hosts: localhost\n"
+        "  roles:\n"
+        "    - external.vendor.agent\n"
+        "  tasks:\n"
+        "    - ansible.builtin.debug:\n"
+        "        msg: hi\n",
         encoding="utf-8",
     )
     return tmp_path
@@ -73,6 +92,24 @@ def test_read_changed_files_from_lines():
     assert read_changed_files_from_lines(
         ["plugins/action/thing.py\n", "# comment\n", "\n", "  foo.yml  \n"]
     ) == ["plugins/action/thing.py", "foo.yml"]
+
+
+def test_content_index_maps_roles_to_molecule_and_integration_roots(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    graph = build_collection_graph(root)
+    index = build_content_index(root, collection=graph.collection, depth=4)
+
+    assert index.role_to_roots["acme.widgets.agent"] == [
+        "extensions/molecule/thing_mock",
+        "tests/integration/targets/thing_test",
+    ]
+    assert index.role_to_roots["external.vendor.agent"] == [
+        "extensions/molecule/other",
+    ]
+    assert roots_using_roles(index, {"acme.widgets.agent"}) == {
+        "extensions/molecule/thing_mock": ["acme.widgets.agent"],
+        "tests/integration/targets/thing_test": ["acme.widgets.agent"],
+    }
 
 
 def test_impact_plugin_change_selects_scenarios(tmp_path: Path):
