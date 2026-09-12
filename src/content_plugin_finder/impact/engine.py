@@ -233,7 +233,7 @@ def compute_impact(
         affected_roles=sorted(affected_roles),
         molecule_scenarios=molecule,
         integration_targets=integration,
-        reasons={k: v for k, v in sorted(reasons.items())},
+        reasons={k: sorted(v) for k, v in sorted(reasons.items())},
     )
 
 

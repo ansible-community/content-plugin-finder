@@ -329,6 +329,35 @@ def test_affected_roles_are_sorted(tmp_path: Path):
     ]
 
 
+def test_reason_lists_are_deterministic_for_reversed_changed_files(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    changed_files = [
+        "roles/agent/vars/main.yml",
+        "roles/agent/tasks/main.yml",
+    ]
+
+    forward = compute_impact(
+        collection_root=root,
+        changed_files=changed_files,
+        parent=root,
+    )
+    reverse = compute_impact(
+        collection_root=root,
+        changed_files=list(reversed(changed_files)),
+        parent=root,
+    )
+
+    expected_reasons = [
+        "role:acme.widgets.agent via roles/agent/tasks/main.yml",
+        "role:acme.widgets.agent via roles/agent/vars/main.yml",
+    ]
+    assert forward.reasons == reverse.reasons
+    assert forward.reasons == {
+        "extensions/molecule/thing_mock": expected_reasons,
+        "tests/integration/targets/thing_test": expected_reasons,
+    }
+
+
 def test_impact_json_always_contains_affected_roles(tmp_path: Path):
     root = _mini_collection(tmp_path)
     report = compute_impact(
