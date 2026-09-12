@@ -12,6 +12,7 @@ from content_plugin_finder.impact.content_index import (
     build_content_index,
     classify_root,
     roots_using_plugins,
+    roots_using_roles,
 )
 from content_plugin_finder.models import PluginKind
 
@@ -21,6 +22,7 @@ class ImpactReport:
     collection: str
     changed_files: list[str] = field(default_factory=list)
     affected_plugins: list[str] = field(default_factory=list)
+    affected_roles: list[str] = field(default_factory=list)
     molecule_scenarios: list[str] = field(default_factory=list)
     integration_targets: list[str] = field(default_factory=list)
     # root relpath -> reasons (changed file and/or plugins)
@@ -31,6 +33,7 @@ class ImpactReport:
             "collection": self.collection,
             "changed_files": self.changed_files,
             "affected_plugins": self.affected_plugins,
+            "affected_roles": self.affected_roles,
             "molecule_scenarios": self.molecule_scenarios,
             "integration_targets": self.integration_targets,
             "reasons": self.reasons,
@@ -39,6 +42,16 @@ class ImpactReport:
 
 def _normalize_rel(path: str) -> str:
     return path.replace("\\", "/").lstrip("./")
+
+
+def _role_for_file(changed: str, collection: str) -> str | None:
+    parts = changed.split("/")
+    if len(parts) < 3 or parts[0] != "roles":
+        return None
+    role = parts[1]
+    if not role or role in {".", ".."}:
+        return None
+    return f"{collection}.{role}"
 
 
 def _root_containing_file(
@@ -161,6 +174,7 @@ def compute_impact(
 
     reasons: dict[str, list[str]] = defaultdict(list)
     affected_plugins: set[str] = set()
+    affected_roles: set[str] = set()
     normalized_files = [_normalize_rel(f) for f in changed_files]
 
     for changed in normalized_files:
@@ -188,6 +202,15 @@ def compute_impact(
                     if reason not in reasons[root]:
                         reasons[root].append(reason)
 
+        role = _role_for_file(changed, graph.collection)
+        if role is not None:
+            affected_roles.add(role)
+            for root, matched in roots_using_roles(content_index, {role}).items():
+                for matched_role in matched:
+                    reason = f"role:{matched_role} via {changed}"
+                    if reason not in reasons[root]:
+                        reasons[root].append(reason)
+
     molecule: list[str] = []
     integration: list[str] = []
     for root in sorted(reasons):
@@ -207,6 +230,7 @@ def compute_impact(
         collection=graph.collection,
         changed_files=normalized_files,
         affected_plugins=sorted(affected_plugins),
+        affected_roles=sorted(affected_roles),
         molecule_scenarios=molecule,
         integration_targets=integration,
         reasons={k: v for k, v in sorted(reasons.items())},
