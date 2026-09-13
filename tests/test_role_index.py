@@ -144,3 +144,23 @@ def test_roles_used_by_root_skips_invalid_utf8_and_keeps_valid_roles(
         parent=tmp_path,
         collection="acme.widgets",
     ) == {"acme.widgets.agent"}
+
+
+def test_roles_used_by_root_handles_recursive_yaml_aliases(tmp_path: Path):
+    root = tmp_path / "molecule" / "default"
+    root.mkdir(parents=True)
+    (root / "converge.yml").write_text(
+        "recursive: &recursive\n"
+        "  child: *recursive\n"
+        "playbook:\n"
+        "  - hosts: localhost\n"
+        "    roles:\n"
+        "      - agent\n",
+        encoding="utf-8",
+    )
+
+    assert roles_used_by_root(
+        root,
+        parent=tmp_path,
+        collection="acme.widgets",
+    ) == {"acme.widgets.agent"}

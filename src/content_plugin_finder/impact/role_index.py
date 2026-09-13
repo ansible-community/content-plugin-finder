@@ -46,13 +46,25 @@ def _normalize_role(name: str, collection: str) -> str | None:
     return name
 
 
-def _walk_node(node: Any, collection: str) -> tuple[set[str], set[str]]:
+def _walk_node(
+    node: Any,
+    collection: str,
+    visited: set[int] | None = None,
+) -> tuple[set[str], set[str]]:
     roles: set[str] = set()
     imports: set[str] = set()
 
+    if visited is None:
+        visited = set()
+    if isinstance(node, (list, dict)):
+        node_id = id(node)
+        if node_id in visited:
+            return roles, imports
+        visited.add(node_id)
+
     if isinstance(node, list):
         for item in node:
-            item_roles, item_imports = _walk_node(item, collection)
+            item_roles, item_imports = _walk_node(item, collection, visited)
             roles.update(item_roles)
             imports.update(item_imports)
         return roles, imports
@@ -85,7 +97,7 @@ def _walk_node(node: Any, collection: str) -> tuple[set[str], set[str]]:
             imports.add(raw)
 
     for value in node.values():
-        child_roles, child_imports = _walk_node(value, collection)
+        child_roles, child_imports = _walk_node(value, collection, visited)
         roles.update(child_roles)
         imports.update(child_imports)
     return roles, imports
