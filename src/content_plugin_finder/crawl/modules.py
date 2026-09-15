@@ -52,7 +52,11 @@ class ModuleCrawler(Crawler):
                 line: int | None = None
 
                 if obj_type == "task":
-                    name = getattr(obj, "resolved_name", "") or getattr(obj, "module", "") or ""
+                    name = (
+                        getattr(obj, "resolved_name", "")
+                        or getattr(obj, "module", "")
+                        or ""
+                    )
                     lines = getattr(obj, "line_num_in_file", None) or []
                     if lines:
                         line = int(lines[0])

@@ -86,7 +86,9 @@ class CollectionGraph:
         return {
             "collection": self.collection,
             "root": str(self.root),
-            "resolved": {name: res.to_dict() for name, res in sorted(self.resolved.items())},
+            "resolved": {
+                name: res.to_dict() for name, res in sorted(self.resolved.items())
+            },
             "file_to_plugins": self.file_to_plugins,
             "plugins": dict(by_kind),
             "imports": self.imports,
@@ -100,9 +102,11 @@ def _known_module_qualnames(plugins: list[PluginFile]) -> dict[str, str]:
     return {p.qualname: p.relpath for p in plugins}
 
 
-def _match_import_to_known(imported: str, known: dict[str, str], prefix: str) -> str | None:
+def _match_import_to_known(
+    imported: str, known: dict[str, str], prefix: str
+) -> str | None:
     """Strip attribute suffixes until we hit a known module qualname."""
-    if not imported.startswith(prefix) and not imported.startswith("ansible_collections."):
+    if not imported.startswith((prefix, "ansible_collections.")):
         return None
     parts = imported.split(".")
     while parts:
@@ -141,7 +145,15 @@ def _transitive_deps(
 
 
 def _primary_kind(files: list[PluginFile]) -> str:
-    order = ["modules", "action", "filter", "lookup", "inventory", "connection", "callback"]
+    order = [
+        "modules",
+        "action",
+        "filter",
+        "lookup",
+        "inventory",
+        "connection",
+        "callback",
+    ]
     kinds = {p.kind for p in files}
     for kind in order:
         if kind in kinds:
@@ -188,7 +200,9 @@ def _build_resolved(
     return resolved
 
 
-def _build_file_to_plugins(resolved: dict[str, PluginResolution]) -> dict[str, list[str]]:
+def _build_file_to_plugins(
+    resolved: dict[str, PluginResolution],
+) -> dict[str, list[str]]:
     mapping: dict[str, set[str]] = defaultdict(set)
     for fqcn, res in resolved.items():
         for path in (*res.entry_files, *res.depends_on_files):
@@ -213,17 +227,21 @@ def build_collection_graph(collection_root: Path) -> CollectionGraph:
     name_index: dict[str, list[str]] = defaultdict(list)
 
     for kind, path in iter_plugin_python_files(root):
-        if path.name == "__init__.py" and kind in {
-            "action",
-            "filter",
-            "lookup",
-            "modules",
-            "connection",
-            "inventory",
-            "callback",
-        }:
-            if path.parent == root / "plugins" / kind:
-                continue
+        if (
+            path.name == "__init__.py"
+            and kind
+            in {
+                "action",
+                "filter",
+                "lookup",
+                "modules",
+                "connection",
+                "inventory",
+                "callback",
+            }
+            and path.parent == root / "plugins" / kind
+        ):
+            continue
 
         try:
             source = path.read_text(encoding="utf-8")
@@ -250,7 +268,10 @@ def build_collection_graph(collection_root: Path) -> CollectionGraph:
             else:
                 names = []
         elif kind == "filter":
-            names = [_fqcn(collection, short) for short in extract_filter_names(source, path.stem)]
+            names = [
+                _fqcn(collection, short)
+                for short in extract_filter_names(source, path.stem)
+            ]
         elif kind == "lookup":
             short = extract_lookup_name(source, path.stem)
             names = [_fqcn(collection, short)]
@@ -272,15 +293,15 @@ def build_collection_graph(collection_root: Path) -> CollectionGraph:
         )
         imports_map[qualname] = file_imports
         for imported in file_imports:
-            if imported.startswith(prefix) or imported.startswith("ansible_collections."):
+            if imported.startswith((prefix, "ansible_collections.")):
                 imported_by[imported].append(relpath)
         for name in names:
             name_index[name].append(relpath)
 
-    for key in imported_by:
-        imported_by[key] = sorted(set(imported_by[key]))
-    for key in name_index:
-        name_index[key] = sorted(set(name_index[key]))
+    for key, value in imported_by.items():
+        imported_by[key] = sorted(set(value))
+    for key, value in name_index.items():
+        name_index[key] = sorted(set(value))
 
     resolved = _build_resolved(collection, plugins, imports_map)
     file_to_plugins = _build_file_to_plugins(resolved)
@@ -297,7 +318,9 @@ def build_collection_graph(collection_root: Path) -> CollectionGraph:
     )
 
 
-def format_collection_graph_text(graph: CollectionGraph, *, plugin: str | None = None) -> str:
+def format_collection_graph_text(
+    graph: CollectionGraph, *, plugin: str | None = None
+) -> str:
     lines: list[str] = [f"collection: {graph.collection}", f"root: {graph.root}", ""]
 
     if plugin:
@@ -306,7 +329,9 @@ def format_collection_graph_text(graph: CollectionGraph, *, plugin: str | None =
             return f"collection: {graph.collection}\nerror: unknown plugin {plugin!r}\n"
         return _format_resolution(res) + "\n"
 
-    lines.append(f"[resolved plugins]  (FQCN = {graph.collection}.<plugin> from galaxy.yml)")
+    lines.append(
+        f"[resolved plugins]  (FQCN = {graph.collection}.<plugin> from galaxy.yml)"
+    )
     for name, res in sorted(graph.resolved.items()):
         lines.append(f"  {name}  ({res.kind})")
         lines.append(f"    entry: {', '.join(res.entry_files)}")

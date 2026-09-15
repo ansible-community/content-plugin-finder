@@ -71,7 +71,9 @@ class LookupCrawler(Crawler):
                 action = getattr(obj, "module", "") or ""
                 if action not in _LOOKUP_ACTIONS:
                     continue
-                name = _lookup_name_from_module_options(getattr(obj, "module_options", None))
+                name = _lookup_name_from_module_options(
+                    getattr(obj, "module_options", None)
+                )
                 if not name:
                     continue
                 path = getattr(obj, "filepath", "") or ""

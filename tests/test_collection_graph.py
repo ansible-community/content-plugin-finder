@@ -9,40 +9,43 @@ from content_plugin_finder.collection.plugins import (
 
 
 def test_extract_action_module_name_from_constant():
-    source = '''
+    source = """
 class ActionModule:
     MODULE_NAME = "application"
-'''
-    assert extract_action_module_name(source, "application", {"application"}) == "application"
+"""
+    assert (
+        extract_action_module_name(source, "application", {"application"})
+        == "application"
+    )
 
 
 def test_extract_action_skips_base_helper():
-    source = '''
+    source = """
 class BaseResourceActionPlugin:
     pass
-'''
+"""
     assert extract_action_module_name(source, "base_action", {"application"}) is None
 
 
 def test_extract_filter_names_from_dict_return():
-    source = '''
+    source = """
 class FilterModule:
     def filters(self):
         return {
             "to_nice": to_nice,
             "my_other": my_other,
         }
-'''
+"""
     assert extract_filter_names(source, "stuff") == ["to_nice", "my_other"]
 
 
 def test_extract_filter_names_assigned_then_returned():
-    source = '''
+    source = """
 class FilterModule:
     def filters(self):
         filters = dict(alpha=alpha, beta=beta)
         return filters
-'''
+"""
     assert extract_filter_names(source, "stuff") == ["alpha", "beta"]
 
 
@@ -86,7 +89,9 @@ def test_build_mini_collection_graph(tmp_path: Path):
     graph = build_collection_graph(tmp_path)
     assert graph.collection == "acme.widgets"
 
-    action_plugin = next(p for p in graph.plugins if p.kind == "action" and p.stem == "thing")
+    action_plugin = next(
+        p for p in graph.plugins if p.kind == "action" and p.stem == "thing"
+    )
     assert action_plugin.module_stem == "thing"
     assert action_plugin.names == ["acme.widgets.thing"]
 
@@ -111,10 +116,14 @@ def test_build_mini_collection_graph(tmp_path: Path):
 
 
 def test_cli_collection_graph_json(tmp_path: Path, capsys):
-    (tmp_path / "galaxy.yml").write_text("namespace: acme\nname: widgets\n", encoding="utf-8")
+    (tmp_path / "galaxy.yml").write_text(
+        "namespace: acme\nname: widgets\n", encoding="utf-8"
+    )
     mod = tmp_path / "plugins" / "modules"
     mod.mkdir(parents=True)
-    (mod / "thing.py").write_text("DOCUMENTATION = '''\nmodule: thing\n'''\n", encoding="utf-8")
+    (mod / "thing.py").write_text(
+        "DOCUMENTATION = '''\nmodule: thing\n'''\n", encoding="utf-8"
+    )
     assert main(["--collection-graph", str(tmp_path), "--format", "json"]) == 0
     out = capsys.readouterr().out
     assert '"collection": "acme.widgets"' in out

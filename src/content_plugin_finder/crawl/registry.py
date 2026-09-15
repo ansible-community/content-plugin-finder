@@ -19,7 +19,9 @@ class CrawlerRegistry:
     def all(self) -> list[Crawler]:
         return [self._crawlers[name] for name in sorted(self._crawlers)]
 
-    def for_kinds(self, kinds: set[PluginKind] | frozenset[PluginKind]) -> list[Crawler]:
+    def for_kinds(
+        self, kinds: set[PluginKind] | frozenset[PluginKind]
+    ) -> list[Crawler]:
         selected: list[Crawler] = []
         for crawler in self.all():
             if crawler.kinds & kinds:
