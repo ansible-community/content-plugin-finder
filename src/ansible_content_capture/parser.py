@@ -54,7 +54,13 @@ class Parser:
         self.skip_playbook_format_error = skip_playbook_format_error
         self.skip_task_format_error = skip_task_format_error
 
-    def run(self, load_data=None, load_json_path="", collection_name_of_project=""):
+    def run(
+        self,
+        load_data=None,
+        load_json_path="",
+        collection_name_of_project="",
+        preloaded_object=None,
+    ):
         ld = Load()
         if load_data is not None:
             ld = load_data
@@ -65,73 +71,76 @@ class Parser:
 
         collection_name = ""
         role_name = ""
-        obj = None
+        obj = preloaded_object
         if ld.target_type == LoadType.COLLECTION:
             collection_name = ld.target_name
-            try:
-                obj = load_collection(
-                    collection_dir=ld.path,
-                    basedir=ld.path,
-                    use_ansible_doc=self.use_ansible_doc,
-                    skip_playbook_format_error=self.skip_playbook_format_error,
-                    skip_task_format_error=self.skip_task_format_error,
-                    include_test_contents=ld.include_test_contents,
-                    load_children=False,
-                )
-            except PlaybookFormatError:
-                if not self.skip_playbook_format_error:
-                    raise
-            except TaskFormatError:
-                if not self.skip_task_format_error:
-                    raise
-            except Exception:
-                logger.exception("failed to load the collection {}".format(collection_name))
-                return
+            if obj is None:
+                try:
+                    obj = load_collection(
+                        collection_dir=ld.path,
+                        basedir=ld.path,
+                        use_ansible_doc=self.use_ansible_doc,
+                        skip_playbook_format_error=self.skip_playbook_format_error,
+                        skip_task_format_error=self.skip_task_format_error,
+                        include_test_contents=ld.include_test_contents,
+                        load_children=False,
+                    )
+                except PlaybookFormatError:
+                    if not self.skip_playbook_format_error:
+                        raise
+                except TaskFormatError:
+                    if not self.skip_task_format_error:
+                        raise
+                except Exception:
+                    logger.exception("failed to load the collection {}".format(collection_name))
+                    return
         elif ld.target_type == LoadType.ROLE:
             role_name = ld.target_name
-            try:
-                obj = load_role(
-                    path=ld.path,
-                    basedir=ld.path,
-                    use_ansible_doc=self.use_ansible_doc,
-                    skip_playbook_format_error=self.skip_playbook_format_error,
-                    skip_task_format_error=self.skip_task_format_error,
-                    include_test_contents=ld.include_test_contents,
-                    load_children=False,
-                )
-                # use fqcn as role_name when the original target_name is a local path
-                if role_name != obj.fqcn:
-                    role_name = obj.fqcn
-            except PlaybookFormatError:
-                if not self.skip_playbook_format_error:
-                    raise
-            except TaskFormatError:
-                if not self.skip_task_format_error:
-                    raise
-            except Exception:
-                logger.exception("failed to load the role {}".format(role_name))
-                return
+            if obj is None:
+                try:
+                    obj = load_role(
+                        path=ld.path,
+                        basedir=ld.path,
+                        use_ansible_doc=self.use_ansible_doc,
+                        skip_playbook_format_error=self.skip_playbook_format_error,
+                        skip_task_format_error=self.skip_task_format_error,
+                        include_test_contents=ld.include_test_contents,
+                        load_children=False,
+                    )
+                except PlaybookFormatError:
+                    if not self.skip_playbook_format_error:
+                        raise
+                except TaskFormatError:
+                    if not self.skip_task_format_error:
+                        raise
+                except Exception:
+                    logger.exception("failed to load the role {}".format(role_name))
+                    return
+            # use fqcn as role_name when the original target_name is a local path
+            if role_name != obj.fqcn:
+                role_name = obj.fqcn
         elif ld.target_type == LoadType.PROJECT:
             repo_name = ld.target_name
-            try:
-                obj = load_repository(
-                    path=ld.path,
-                    basedir=ld.path,
-                    use_ansible_doc=self.use_ansible_doc,
-                    skip_playbook_format_error=self.skip_playbook_format_error,
-                    skip_task_format_error=self.skip_task_format_error,
-                    include_test_contents=ld.include_test_contents,
-                    yaml_label_list=ld.yaml_label_list,
-                )
-            except PlaybookFormatError:
-                if not self.skip_playbook_format_error:
-                    raise
-            except TaskFormatError:
-                if not self.skip_task_format_error:
-                    raise
-            except Exception:
-                logger.exception("failed to load the project {}".format(repo_name))
-                return
+            if obj is None:
+                try:
+                    obj = load_repository(
+                        path=ld.path,
+                        basedir=ld.path,
+                        use_ansible_doc=self.use_ansible_doc,
+                        skip_playbook_format_error=self.skip_playbook_format_error,
+                        skip_task_format_error=self.skip_task_format_error,
+                        include_test_contents=ld.include_test_contents,
+                        yaml_label_list=ld.yaml_label_list,
+                    )
+                except PlaybookFormatError:
+                    if not self.skip_playbook_format_error:
+                        raise
+                except TaskFormatError:
+                    if not self.skip_task_format_error:
+                        raise
+                except Exception:
+                    logger.exception("failed to load the project {}".format(repo_name))
+                    return
             if obj.my_collection_name:
                 collection_name = obj.my_collection_name
             if collection_name == "" and collection_name_of_project != "":
@@ -151,7 +160,9 @@ class Parser:
                     basedir, target_playbook_path = split_target_playbook_fullpath(ld.path)
             playbook_name = ld.target_name
             try:
-                if ld.playbook_only:
+                if obj is not None:
+                    pass
+                elif ld.playbook_only:
                     obj = load_playbook(
                         path=target_playbook_path,
                         yaml_str=ld.playbook_yaml,
@@ -193,7 +204,9 @@ class Parser:
                     basedir, target_taskfile_path = split_target_taskfile_fullpath(ld.path)
             taskfile_name = ld.target_name
             try:
-                if ld.taskfile_only:
+                if obj is not None:
+                    pass
+                elif ld.taskfile_only:
                     obj = load_taskfile(
                         path=target_taskfile_path,
                         yaml_str=ld.taskfile_yaml,
@@ -395,6 +408,34 @@ class Parser:
         elif ld.target_type == LoadType.TASKFILE:
             pass
         elif ld.target_type == LoadType.PROJECT:
+            # The inventory pass intentionally loads only child paths. Translate
+            # the project's direct children to the keys produced above so the
+            # optimized path retains the original resolvable graph semantics.
+            loaded_children = {
+                "roles": roles,
+                "taskfiles": taskfiles,
+                "modules": modules,
+                "playbooks": playbooks,
+            }
+            for child_type, child_objects in loaded_children.items():
+                path_to_key = {
+                    child.defined_in: child.key for child in child_objects
+                }
+                path_to_key.update(dict(mappings[child_type]))
+                child_paths = getattr(obj, child_type)
+                setattr(
+                    obj,
+                    child_type,
+                    [
+                        path_to_key.get(child, child)
+                        if isinstance(child, str)
+                        else child
+                        for child in child_paths
+                    ],
+                )
+            # Repository.children_to_key() intentionally keeps File objects, so
+            # restore the fully parsed instances in place of inventory paths.
+            obj.files = files
             projects = [obj]
 
         if len(collections) > 0:

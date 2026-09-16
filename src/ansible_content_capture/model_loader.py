@@ -1461,6 +1461,7 @@ def load_task(
     parent_key="",
     parent_local_key="",
     yaml_lines="",
+    yaml_line_list=None,
     previous_task_line=-1,
     basedir="",
 ):
@@ -1498,6 +1499,7 @@ def load_task(
     taskObj.set_yaml_lines(
         fullpath=fullpath,
         yaml_lines=yaml_lines,
+        yaml_line_list=yaml_line_list,
         task_name=task_name,
         module_name=module_name,
         module_options=module_options,
@@ -1659,6 +1661,7 @@ def load_taskfile(path, yaml_str="", role_name="", collection_name="", basedir="
 
     if task_dicts is None:
         return tfObj
+    yaml_line_list = yaml_lines.splitlines()
     tasks = []
     task_loading = {
         "total": 0,
@@ -1682,6 +1685,7 @@ def load_taskfile(path, yaml_str="", role_name="", collection_name="", basedir="
                 parent_local_key=tfObj.local_key,
                 previous_task_line=last_task_line_num,
                 basedir=basedir,
+                yaml_line_list=yaml_line_list,
             )
             tasks.append(t)
             if t:
@@ -1826,7 +1830,16 @@ def load_collection(
         taskfiles = []
         for taskfile_path in taskfile_paths:
             try:
-                tf = load_taskfile(taskfile_path, basedir=basedir)
+                tf = load_taskfile(
+                    taskfile_path,
+                    basedir=basedir,
+                    skip_task_format_error=skip_task_format_error,
+                )
+            except TaskFormatError:
+                if not skip_task_format_error:
+                    raise
+                logger.exception("error while loading the task file at {}".format(taskfile_path))
+                continue
             except Exception:
                 logger.exception("error while loading the task file at {}".format(taskfile_path))
                 continue
@@ -1842,6 +1855,8 @@ def load_collection(
         path=fullpath,
         basedir=basedir,
         use_ansible_doc=use_ansible_doc,
+        skip_playbook_format_error=skip_playbook_format_error,
+        skip_task_format_error=skip_task_format_error,
         include_test_contents=include_test_contents,
         load_children=load_children,
     )
@@ -1887,14 +1902,35 @@ def load_collection(
     return colObj
 
 
-def load_object(loadObj):
+def load_object(
+    loadObj,
+    use_ansible_doc=True,
+    skip_playbook_format_error=True,
+    skip_task_format_error=True,
+):
     target_type = loadObj.target_type
     path = loadObj.path
     obj = None
     if target_type == LoadType.COLLECTION:
-        obj = load_collection(collection_dir=path, basedir=path, include_test_contents=loadObj.include_test_contents, load_children=False)
+        obj = load_collection(
+            collection_dir=path,
+            basedir=path,
+            use_ansible_doc=use_ansible_doc,
+            skip_playbook_format_error=skip_playbook_format_error,
+            skip_task_format_error=skip_task_format_error,
+            include_test_contents=loadObj.include_test_contents,
+            load_children=False,
+        )
     elif target_type == LoadType.ROLE:
-        obj = load_role(path=path, basedir=path, include_test_contents=loadObj.include_test_contents, load_children=False)
+        obj = load_role(
+            path=path,
+            basedir=path,
+            use_ansible_doc=use_ansible_doc,
+            skip_playbook_format_error=skip_playbook_format_error,
+            skip_task_format_error=skip_task_format_error,
+            include_test_contents=loadObj.include_test_contents,
+            load_children=False,
+        )
     elif target_type == LoadType.PLAYBOOK:
         basedir = ""
         target_playbook_path = ""
@@ -1909,9 +1945,23 @@ def load_object(loadObj):
             else:
                 basedir, target_playbook_path = split_target_playbook_fullpath(path)
         if loadObj.playbook_only:
-            obj = load_playbook(path=target_playbook_path, yaml_str=loadObj.playbook_yaml, basedir=basedir)
+            obj = load_playbook(
+                path=target_playbook_path,
+                yaml_str=loadObj.playbook_yaml,
+                basedir=basedir,
+                skip_playbook_format_error=skip_playbook_format_error,
+                skip_task_format_error=skip_task_format_error,
+            )
         else:
-            obj = load_repository(path=basedir, basedir=basedir, target_playbook_path=target_playbook_path, load_children=False)
+            obj = load_repository(
+                path=basedir,
+                basedir=basedir,
+                target_playbook_path=target_playbook_path,
+                use_ansible_doc=use_ansible_doc,
+                skip_playbook_format_error=skip_playbook_format_error,
+                skip_task_format_error=skip_task_format_error,
+                load_children=False,
+            )
     elif target_type == LoadType.TASKFILE:
         basedir = ""
         target_taskfile_path = ""
@@ -1926,12 +1976,32 @@ def load_object(loadObj):
             else:
                 basedir, target_taskfile_path = split_target_taskfile_fullpath(path)
         if loadObj.taskfile_only:
-            obj = load_taskfile(path=target_taskfile_path, yaml_str=loadObj.taskfile_yaml, basedir=basedir)
+            obj = load_taskfile(
+                path=target_taskfile_path,
+                yaml_str=loadObj.taskfile_yaml,
+                basedir=basedir,
+                skip_task_format_error=skip_task_format_error,
+            )
         else:
-            obj = load_repository(path=basedir, basedir=basedir, target_taskfile_path=target_taskfile_path, load_children=False)
+            obj = load_repository(
+                path=basedir,
+                basedir=basedir,
+                target_taskfile_path=target_taskfile_path,
+                use_ansible_doc=use_ansible_doc,
+                skip_playbook_format_error=skip_playbook_format_error,
+                skip_task_format_error=skip_task_format_error,
+                load_children=False,
+            )
     elif target_type == LoadType.PROJECT:
         obj = load_repository(
-            path=path, basedir=path, include_test_contents=loadObj.include_test_contents, yaml_label_list=loadObj.yaml_label_list, load_children=False
+            path=path,
+            basedir=path,
+            use_ansible_doc=use_ansible_doc,
+            skip_playbook_format_error=skip_playbook_format_error,
+            skip_task_format_error=skip_task_format_error,
+            include_test_contents=loadObj.include_test_contents,
+            yaml_label_list=loadObj.yaml_label_list,
+            load_children=False,
         )
 
     if hasattr(obj, "roles"):
@@ -1958,6 +2028,7 @@ def load_object(loadObj):
         loadObj.taskfiles = [obj.defined_in]
 
     loadObj.timestamp = datetime.datetime.utcnow().isoformat()
+    return obj
 
 
 def find_playbook_role_module(path, use_ansible_doc=True):
