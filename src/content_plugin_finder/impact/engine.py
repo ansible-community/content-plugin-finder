@@ -9,8 +9,8 @@ from content_plugin_finder.collection.graph import (
     CollectionGraph,
     build_collection_graph,
 )
-from content_plugin_finder.discover import discover_scan_roots
 from content_plugin_finder.crawl.orchestrator import default_workers
+from content_plugin_finder.discover import discover_scan_roots
 from content_plugin_finder.impact.content_index import (
     ContentIndex,
     build_content_index,

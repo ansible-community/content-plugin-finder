@@ -49,7 +49,9 @@ def build_content_index(
 ) -> ContentIndex:
     parent = parent.resolve()
     scan_roots = discover_scan_roots(parent, depth)
-    report = Orchestrator().scan(scan_roots, kinds=kinds or list(PluginKind), workers=workers)
+    report = Orchestrator().scan(
+        scan_roots, kinds=kinds or list(PluginKind), workers=workers
+    )
 
     index = ContentIndex(collection=collection)
     plugin_to_roots: dict[str, set[str]] = defaultdict(set)
