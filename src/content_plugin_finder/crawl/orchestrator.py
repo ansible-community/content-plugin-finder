@@ -17,7 +17,7 @@ from content_plugin_finder.models import (
 )
 
 
-def default_jobs() -> int:
+def default_workers() -> int:
     """Return a conservative default for CPU-bound directory scans."""
     return min(4, os.cpu_count() or 1)
 
@@ -54,21 +54,21 @@ class Orchestrator:
         self,
         directories: Sequence[Path | str],
         kinds: Iterable[PluginKind] | None = None,
-        jobs: int = 1,
+        workers: int = 1,
     ) -> ScanReport:
         kind_set = frozenset(kinds) if kinds is not None else frozenset(PluginKind)
-        if jobs < 1:
-            raise ValueError("jobs must be >= 1")
+        if workers < 1:
+            raise ValueError("workers must be >= 1")
 
         inputs = list(directories)
         report = ScanReport()
-        if jobs == 1 or len(inputs) <= 1:
+        if workers == 1 or len(inputs) <= 1:
             results = (_scan_directory(raw, kind_set, self.registry) for raw in inputs)
             for path, directory_report in results:
                 report.directories[path] = directory_report
             return report
 
-        with ProcessPoolExecutor(max_workers=min(jobs, len(inputs))) as executor:
+        with ProcessPoolExecutor(max_workers=min(workers, len(inputs))) as executor:
             # executor.map preserves input order, keeping reports deterministic.
             results = executor.map(
                 _scan_directory,

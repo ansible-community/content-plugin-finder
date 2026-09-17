@@ -73,7 +73,7 @@ content-plugin-finder --list-crawlers
 # Discover Molecule scenarios + integration targets under a collection/repo
 content-plugin-finder --parent ../ansible.platform --depth 4 --list-roots
 content-plugin-finder --parent ../ansible.platform --depth 4
-content-plugin-finder --parent ../ansible.platform --jobs 8
+content-plugin-finder --parent ../ansible.platform --workers 8
 ```
 
 `--parent` walks for:
@@ -85,10 +85,10 @@ content-plugin-finder --parent ../ansible.platform --jobs 8
 For a collection root, depth `3` reaches `extensions/molecule/<scenario>`;
 depth `4` also reaches `tests/integration/targets/<target>`.
 
-CLI directory scans use up to four processes by default. Use `--jobs N` to tune
-the parallelism for the available CPU and memory, or `--jobs 1` for serial
+CLI directory scans use up to four processes by default. Use `--workers N` to tune
+the parallelism for the available CPU and memory, or `--workers 1` for serial
 execution. Library calls through `Orchestrator.scan()` remain serial unless
-`jobs` is explicitly set.
+`workers` is explicitly set.
 
 ## Crawler subsystem
 

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from content_plugin_finder.cli import build_parser, main
-from content_plugin_finder.crawl.orchestrator import default_jobs
+from content_plugin_finder.crawl.orchestrator import default_workers
 
 FIXTURES = Path(__file__).parent / "fixtures"
 MOLECULE = FIXTURES / "molecule_scenario"
@@ -69,14 +69,14 @@ def test_cli_parent_scan(tmp_path: Path, capsys):
     assert "filter: default" in out
 
 
-def test_cli_rejects_invalid_jobs():
+def test_cli_rejects_invalid_workers():
     try:
-        main([str(MOLECULE), "--jobs", "0"])
+        main([str(MOLECULE), "--workers", "0"])
     except SystemExit as exc:
         assert exc.code == 2
     else:
-        raise AssertionError("expected argparse to reject --jobs 0")
+        raise AssertionError("expected argparse to reject --workers 0")
 
 
 def test_cli_uses_parallel_default():
-    assert build_parser().parse_args([str(MOLECULE)]).jobs == default_jobs()
+    assert build_parser().parse_args([str(MOLECULE)]).workers == default_workers()

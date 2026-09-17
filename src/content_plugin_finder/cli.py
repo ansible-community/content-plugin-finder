@@ -10,7 +10,7 @@ from content_plugin_finder.collection.graph import (
     format_collection_graph_text,
     format_resolution_json,
 )
-from content_plugin_finder.crawl.orchestrator import Orchestrator, default_jobs
+from content_plugin_finder.crawl.orchestrator import Orchestrator, default_workers
 from content_plugin_finder.crawl.registry import default_registry
 from content_plugin_finder.discover import discover_scan_roots
 from content_plugin_finder.impact.engine import (
@@ -164,9 +164,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated plugin kinds: module,filter,lookup",
     )
     parser.add_argument(
-        "--jobs",
+        "--workers",
         type=_positive_int,
-        default=default_jobs(),
+        default=default_workers(),
         help="Parallel scan processes (default: up to 4)",
     )
     parser.add_argument(
@@ -299,7 +299,11 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     try:
-        report = Orchestrator().scan(directories, kinds=args.types, jobs=args.jobs)
+        report = Orchestrator().scan(
+            directories,
+            kinds=args.types,
+            workers=args.workers,
+        )
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

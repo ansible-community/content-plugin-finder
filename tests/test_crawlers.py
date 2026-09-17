@@ -90,7 +90,7 @@ def test_orchestrator_parallel_scan_preserves_directory_order(tmp_path: Path):
         )
         roots.append(root)
 
-    report = Orchestrator().scan(roots, kinds=[PluginKind.FILTER], jobs=2)
+    report = Orchestrator().scan(roots, kinds=[PluginKind.FILTER], workers=2)
 
     assert list(report.directories) == [str(root.resolve()) for root in roots]
     assert {plugin.name for plugin in report.merged().filters} == {"trim", "upper"}
