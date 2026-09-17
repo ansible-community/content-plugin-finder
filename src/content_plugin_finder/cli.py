@@ -242,6 +242,7 @@ def _run_impact(args: argparse.Namespace) -> int:
             changed_files=changed,
             parent=parent,
             depth=args.depth,
+            workers=args.workers,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

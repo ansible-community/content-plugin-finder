@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from content_plugin_finder.crawl.orchestrator import Orchestrator
+from content_plugin_finder.crawl.orchestrator import Orchestrator, default_workers
 from content_plugin_finder.discover import discover_scan_roots
 from content_plugin_finder.models import PluginKind
 
@@ -45,10 +45,11 @@ def build_content_index(
     collection: str,
     depth: int = 4,
     kinds: list[PluginKind] | None = None,
+    workers: int = default_workers(),
 ) -> ContentIndex:
     parent = parent.resolve()
     scan_roots = discover_scan_roots(parent, depth)
-    report = Orchestrator().scan(scan_roots, kinds=kinds or list(PluginKind))
+    report = Orchestrator().scan(scan_roots, kinds=kinds or list(PluginKind), workers=workers)
 
     index = ContentIndex(collection=collection)
     plugin_to_roots: dict[str, set[str]] = defaultdict(set)
