@@ -17,8 +17,8 @@
 import sys
 import logging
 
-
 _logger = None
+_handler = None
 
 log_level_map = {
     "error": logging.ERROR,
@@ -29,13 +29,18 @@ log_level_map = {
 
 
 def set_logger_channel(channel: str = ""):
-    global _logger
+    global _handler, _logger
+    if _logger is not None and _handler is not None:
+        _logger.removeHandler(_handler)
+        _handler.close()
+
     _logger = logging.getLogger(channel)
-    handler = logging.StreamHandler(sys.stdout)
+    _logger.propagate = False
+    _handler = logging.StreamHandler(sys.stderr)
     # default formatter
     formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
-    handler.setFormatter(formatter)
-    _logger.addHandler(handler)
+    _handler.setFormatter(formatter)
+    _logger.addHandler(_handler)
 
 
 def set_log_level(level_str: str = "info"):

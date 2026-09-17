@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from content_plugin_finder.cli import main
@@ -24,8 +25,29 @@ def test_cli_text_scan(capsys):
 def test_cli_json_scan(capsys):
     assert main([str(MOLECULE), "--format", "json", "--types", "filter"]) == 0
     out = capsys.readouterr().out
-    assert '"filters"' in out
-    assert "default" in out
+    payload = json.loads(out)
+    assert payload["all"]["filters"][0]["name"] == "default"
+
+
+def test_cli_json_routes_scanner_warnings_to_stderr(monkeypatch, capfd):
+    import ansible_content_capture.logger as scanner_logger
+    from ansible_content_capture.scanner import AnsibleScanner
+
+    scanner_logger.set_logger_channel("ansible-scan")
+    scanner_logger.set_log_level("warning")
+
+    def run_with_warning(self, target_dir="", raw_yaml="", **kwargs):
+        scanner_logger.warning("metadata not found: amazon.aws")
+        return type("ScanResult", (), {"trees": []})()
+
+    monkeypatch.setattr(AnsibleScanner, "run", run_with_warning)
+
+    assert main([str(MOLECULE), "--format", "json", "--types", "module"]) == 0
+    captured = capfd.readouterr()
+
+    json.loads(captured.out)
+    assert "WARNING" not in captured.out
+    assert captured.err == "WARNING:ansible-scan:metadata not found: amazon.aws\n"
 
 
 def test_cli_missing_dir():
