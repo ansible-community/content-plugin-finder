@@ -421,8 +421,13 @@ class ScanData(object):
             include_test_contents=self.include_test_contents,
             yaml_label_list=self.yaml_label_list,
         )
-        load_object(ld)
-        return ld
+        loaded_object = load_object(
+            ld,
+            use_ansible_doc=self.use_ansible_doc,
+            skip_playbook_format_error=self.skip_playbook_format_error,
+            skip_task_format_error=self.skip_task_format_error,
+        )
+        return ld, loaded_object
 
     def get_definition_path(self, ext_type, ext_name):
         target_path = ""
@@ -441,7 +446,7 @@ class ScanData(object):
         return target_path
 
     def load_definition_ext(self, target_type, target_name, target_path):
-        ld = self.create_load_file(target_type, target_name, target_path)
+        ld, loaded_object = self.create_load_file(target_type, target_name, target_path)
         use_cache = True
         output_dir = self.get_definition_path(ld.target_type, ld.target_name)
         if use_cache and os.path.exists(os.path.join(output_dir, "mappings.json")):
@@ -449,7 +454,10 @@ class ScanData(object):
                 logger.debug("use cache from {}".format(output_dir))
             definitions, mappings = Parser.restore_definition_objects(output_dir)
         else:
-            definitions, mappings = self._parser.run(load_data=ld)
+            definitions, mappings = self._parser.run(
+                load_data=ld,
+                preloaded_object=loaded_object,
+            )
             if self.do_save:
                 if output_dir == "":
                     raise ValueError("Invalid output_dir")
@@ -466,18 +474,27 @@ class ScanData(object):
 
     def _set_load_root(self, target_path=""):
         root_load_data = None
+        loaded_object = None
         if self.type in [LoadType.ROLE, LoadType.COLLECTION]:
             ext_type = self.type
             ext_name = self.name
             if target_path == "":
                 target_path = self.get_source_path(ext_type, ext_name)
-            root_load_data = self.create_load_file(ext_type, ext_name, target_path)
+            root_load_data, loaded_object = self.create_load_file(
+                ext_type,
+                ext_name,
+                target_path,
+            )
         elif self.type in [LoadType.PROJECT, LoadType.PLAYBOOK, LoadType.TASKFILE]:
             src_root = self.get_src_root()
             if target_path == "":
                 target_path = os.path.join(src_root, escape_url(self.name))
-            root_load_data = self.create_load_file(self.type, self.name, target_path)
-        return root_load_data
+            root_load_data, loaded_object = self.create_load_file(
+                self.type,
+                self.name,
+                target_path,
+            )
+        return root_load_data, loaded_object
 
     def get_source_path(self, ext_type, ext_name, is_ext_for_project=False):
         base_dir = ""
@@ -506,9 +523,13 @@ class ScanData(object):
 
     def load_definitions_root(self, target_path=""):
         output_dir = self._path_mappings["root_definitions"]
-        root_load = self._set_load_root(target_path=target_path)
+        root_load, loaded_object = self._set_load_root(target_path=target_path)
 
-        definitions, mappings = self._parser.run(load_data=root_load, collection_name_of_project=self.collection_name)
+        definitions, mappings = self._parser.run(
+            load_data=root_load,
+            collection_name_of_project=self.collection_name,
+            preloaded_object=loaded_object,
+        )
         if self.do_save:
             if output_dir == "":
                 raise ValueError("Invalid output_dir")

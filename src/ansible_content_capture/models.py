@@ -904,14 +904,24 @@ class Task(Object, Resolvable):
     module_info: dict = field(default_factory=dict)
     include_info: dict = field(default_factory=dict)
 
-    def set_yaml_lines(self, fullpath="", yaml_lines="", task_name="", module_name="", module_options=None, task_options=None, previous_task_line=-1):
+    def set_yaml_lines(
+        self,
+        fullpath="",
+        yaml_lines="",
+        yaml_line_list=None,
+        task_name="",
+        module_name="",
+        module_options=None,
+        task_options=None,
+        previous_task_line=-1,
+    ):
         if not task_name and not module_options:
             return
 
-        lines = []
-        if yaml_lines:
+        lines = yaml_line_list
+        if lines is None and yaml_lines:
             lines = yaml_lines.splitlines()
-        else:
+        elif lines is None:
             lines = open(fullpath, "r").read().splitlines()
 
         # search candidates that match either of the following conditions

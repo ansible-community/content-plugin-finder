@@ -9,6 +9,7 @@ from content_plugin_finder.collection.graph import (
     CollectionGraph,
     build_collection_graph,
 )
+from content_plugin_finder.crawl.orchestrator import default_workers
 from content_plugin_finder.discover import discover_scan_roots
 from content_plugin_finder.impact.content_index import (
     ContentIndex,
@@ -142,6 +143,7 @@ def compute_impact(
     depth: int = 4,
     graph: CollectionGraph | None = None,
     content_index: ContentIndex | None = None,
+    workers: int = default_workers(),
 ) -> ImpactReport:
     """Map changed files to molecule scenarios and integration targets."""
     collection_root = collection_root.resolve()
@@ -152,6 +154,7 @@ def compute_impact(
         collection=graph.collection,
         depth=depth,
         kinds=list(PluginKind),
+        workers=workers,
     )
 
     # Ensure roots map exists even if index was built separately

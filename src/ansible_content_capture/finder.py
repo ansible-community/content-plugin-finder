@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 import re
 import os
@@ -385,12 +386,24 @@ def find_all_files(root_dir: str):
     return files
 
 
+@lru_cache(maxsize=1024)
+def _load_yaml_file_cached(fpath: str, mtime_ns: int, size: int):
+    """Read and parse a YAML file once for repeated format checks."""
+    del mtime_ns, size  # Included in the key so edits invalidate cached content.
+    with open(fpath, "r") as file:
+        body = file.read()
+    return body, yaml.safe_load(body)
+
+
 def _get_body_data(body: str = "", data: list = None, fpath: str = ""):
     if fpath and not body and not data:
         try:
-            with open(fpath, "r") as file:
-                body = file.read()
-                data = yaml.safe_load(body)
+            stat = os.stat(fpath)
+            body, data = _load_yaml_file_cached(
+                fpath,
+                stat.st_mtime_ns,
+                stat.st_size,
+            )
         except Exception:
             pass
     elif body and not data:
