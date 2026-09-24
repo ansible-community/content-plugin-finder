@@ -18,3 +18,5 @@ htmlcov/
 # local viz data dumps
 /graph.json
 /impact.json
+.claude/
+.tokensave/
