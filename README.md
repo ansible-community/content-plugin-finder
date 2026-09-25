@@ -1,11 +1,11 @@
-# content-plugin-finder
+# content-plugin-finder: Ansible modules, filters, lookups, and roles
 
 > **Unsupported prototype.** This repository is an early experiment under
 > active development. APIs, CLI flags, and behavior may change without notice.
 > There is no support commitment, stability guarantee, or production readiness
 > claim. Use at your own risk.
 
-Find Ansible **modules**, **filters**, and **lookups** used in directories such as Molecule scenarios or ansible-test integration targets, and map git changes to molecule scenarios / ansible-test integration targets that should run.
+Find Ansible **modules**, **filters**, **lookups**, and **roles** used in directories such as Molecule scenarios or ansible-test integration targets, and map git changes to molecule scenarios / ansible-test integration targets that should run.
 
 Uses a pluggable [**crawler subsystem**](#crawler-subsystem).
 
@@ -62,12 +62,12 @@ xdg-open viz/index.html   # or open viz/index.html in your browser
 2. Click **Choose File** / **Load JSON** and select `graph.json` or `impact.json`.
 3. Mode is auto-detected from the JSON shape; you can override with the **Mode** control.
 4. **Plugin dependencies**: pick a **Focus plugin** FQCN (recommended). Click a node for path + owning plugins.
-5. **Impact**: explore changed files → plugins → molecule / integration roots. Counts appear in the toolbar.
+5. **Impact**: explore changed files → plugins or roles → molecule / integration roots. Counts appear in the toolbar.
 
 | Mode                | JSON source                                                  | View                                                                 |
 | ------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------- |
 | Plugin dependencies | `--collection-graph --format json` (full or `--plugin FQCN`) | Focus one FQCN (recommended) or capped “All”; nodes are Python files |
-| Impact              | `--impact --format json`                                     | Changed files → plugin FQCNs → molecule / integration roots          |
+| Impact              | `--impact --format json`                                     | Changed files → plugin or role FQCNs → molecule / integration roots |
 
 No npm build. The file picker works with `file://` (browsers block `fetch` of local paths).
 
@@ -77,6 +77,7 @@ No npm build. The file picker works with `file://` (browsers block `fetch` of lo
 content-plugin-finder path/to/scenario [path/to/target ...]
 content-plugin-finder --format json --by-directory path/to/scenario
 content-plugin-finder --types module,filter path/to/scenario
+content-plugin-finder --types role path/to/scenario
 content-plugin-finder --list-crawlers
 
 # Discover Molecule scenarios + integration targets under a collection/repo
@@ -98,6 +99,9 @@ CLI directory scans use up to four processes by default. Use `--workers N` to tu
 the parallelism for the available CPU and memory, or `--workers 1` for serial
 execution. Library calls through `Orchestrator.scan()` remain serial unless
 `workers` is explicitly set.
+When role references are scanned, imports stay inside each scan root by default.
+Passing `--parent` lets role imports follow static YAML paths elsewhere below that
+parent directory.
 
 ## Crawler subsystem
 
@@ -106,8 +110,18 @@ execution. Library calls through `Orchestrator.scan()` remain serial unless
 | `module` | module | ansible-content-capture task/module trees             |
 | `filter` | filter | Jinja pipes in YAML scalars                           |
 | `lookup` | lookup | ACC lookup/query tasks + Jinja `lookup()` / `query()` |
+| `role`   | role   | Play roles and include/import role actions in YAML    |
 
 Modules and action plugins are reported together as modules (not distinguishable from content alone).
+
+The registered `RoleCrawler` runs through the same orchestrator as the other
+crawlers and is included in default scans. Use `--types role` to scan only roles,
+or combine it with other kinds, such as `--types module,role`.
+
+Role findings appear as `role: <name>` in text output and in the `roles` array
+of merged and per-directory JSON reports. They retain short or fully qualified
+names and include the source YAML file path. Impact analysis consumes these
+findings to build its role-to-scenario/target index.
 
 ## Collection import graph
 
@@ -157,6 +171,30 @@ molecule	extensions/molecule/application_mock
 integration	tests/integration/targets/applications_test
 ```
 
+In JSON mode, the impact report includes stable affected-content fields:
+
+```json
+{
+  "collection": "acme.widgets",
+  "changed_files": ["roles/agent/tasks/main.yml"],
+  "affected_plugins": [],
+  "affected_roles": ["acme.widgets.agent"],
+  "molecule_scenarios": ["extensions/molecule/thing_mock"],
+  "integration_targets": ["tests/integration/targets/thing_test"],
+  "reasons": {
+    "extensions/molecule/thing_mock": [
+      "role:acme.widgets.agent via roles/agent/tasks/main.yml"
+    ],
+    "tests/integration/targets/thing_test": [
+      "role:acme.widgets.agent via roles/agent/tasks/main.yml"
+    ]
+  }
+}
+```
+
+`affected_plugins` and `affected_roles` are always present. Each uses an empty
+list when its content type is unaffected.
+
 In CI, pass the PR **base SHA** (or fetch the target branch). Bare `git diff` without a base is not reliable on shallow/detached checkouts. Three-dot `base...head` is the default; use `--two-dot` for `base head`.
 
 ```text
@@ -166,10 +204,27 @@ git changed files
         │     (path layout works even if discovery depth missed the root)
         ├─ shared molecule file      → all discovered molecule scenarios
         │     (e.g. extensions/molecule/requirements.yml)
-        └─ collection .py            → file_to_plugins → FQCNs
+        ├─ roles/<role>/...          → local role FQCN
+        │       │
+        │       └─ role index → molecule scenarios / integration targets
+        └─ collection .py            → file_to_plugins → plugin FQCNs
                 │
                 └─ content index → molecule scenarios / integration targets
 ```
+
+A changed path below `roles/<role_name>/` affects the local role
+`<namespace>.<collection>.<role_name>`, using the collection identity from
+`galaxy.yml`. Every discovered Molecule scenario or ansible-test integration
+target that references that role is selected. The match is conservative: any
+file owned by the role selects every root that uses the role.
+
+Role crawling supports string and mapping entries under play-level `roles:`,
+plus short and `ansible.builtin` forms of `include_role` and `import_role`.
+Crawler output keeps the role name as written. Impact indexing prefixes short
+names with the local collection FQCN (for example, `agent` becomes
+`acme.widgets.agent`). Literal
+`import_playbook`, `import_tasks`, and `include_tasks` paths are followed while
+they remain below `--parent`; dynamic Jinja import paths are not evaluated.
 
 Direct path matches cover scenario and integration-target edits themselves, not only
 plugin→content reverse mapping. Shared files under a `molecule/` directory (outside
@@ -280,6 +335,8 @@ impact = compute_impact(
 )
 print(impact.molecule_scenarios)
 print(impact.integration_targets)
+print(impact.affected_plugins)
+print(impact.affected_roles)
 ```
 
 ## LICENSE

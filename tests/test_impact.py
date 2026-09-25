@@ -1,10 +1,21 @@
+import json
 from pathlib import Path
+
+import pytest
 
 from content_plugin_finder.cli import main
 from content_plugin_finder.collection.graph import build_collection_graph
-from content_plugin_finder.impact.content_index import build_content_index
-from content_plugin_finder.impact.engine import compute_impact, format_impact_text
+from content_plugin_finder.impact.content_index import (
+    build_content_index,
+    roots_using_roles,
+)
+from content_plugin_finder.impact.engine import (
+    compute_impact,
+    format_impact_json,
+    format_impact_text,
+)
 from content_plugin_finder.impact.git import read_changed_files_from_lines
+from content_plugin_finder.models import PluginKind
 
 
 def _mini_collection(tmp_path: Path) -> Path:
@@ -40,8 +51,19 @@ def _mini_collection(tmp_path: Path) -> Path:
     mol = tmp_path / "extensions" / "molecule" / "thing_mock"
     mol.mkdir(parents=True)
     (mol / "molecule.yml").write_text("driver:\n  name: default\n", encoding="utf-8")
+    role = tmp_path / "roles" / "agent" / "tasks"
+    role.mkdir(parents=True)
+    (role / "main.yml").write_text(
+        "- ansible.builtin.debug:\n    msg: agent\n",
+        encoding="utf-8",
+    )
     (mol / "converge.yml").write_text(
-        "- hosts: localhost\n  tasks:\n    - acme.widgets.thing:\n        name: x\n",
+        "- hosts: localhost\n"
+        "  roles:\n"
+        "    - role: acme.widgets.agent\n"
+        "  tasks:\n"
+        "    - acme.widgets.thing:\n"
+        "        name: x\n",
         encoding="utf-8",
     )
 
@@ -51,7 +73,12 @@ def _mini_collection(tmp_path: Path) -> Path:
     (target / "aliases").write_text("thing\n", encoding="utf-8")
     (target / "tasks").mkdir()
     (target / "tasks" / "main.yml").write_text(
-        "- acme.widgets.thing:\n    name: y\n",
+        "- acme.widgets.thing:\n    name: y\n"
+        "- ansible.builtin.import_tasks: role.yml\n",
+        encoding="utf-8",
+    )
+    (target / "tasks" / "role.yml").write_text(
+        "- ansible.builtin.include_role:\n    name: agent\n",
         encoding="utf-8",
     )
 
@@ -60,7 +87,12 @@ def _mini_collection(tmp_path: Path) -> Path:
     other.mkdir(parents=True)
     (other / "molecule.yml").write_text("driver:\n  name: default\n", encoding="utf-8")
     (other / "converge.yml").write_text(
-        "- hosts: localhost\n  tasks:\n    - ansible.builtin.debug:\n        msg: hi\n",
+        "- hosts: localhost\n"
+        "  roles:\n"
+        "    - external.vendor.agent\n"
+        "  tasks:\n"
+        "    - ansible.builtin.debug:\n"
+        "        msg: hi\n",
         encoding="utf-8",
     )
     return tmp_path
@@ -70,6 +102,43 @@ def test_read_changed_files_from_lines():
     assert read_changed_files_from_lines(
         ["plugins/action/thing.py\n", "# comment\n", "\n", "  foo.yml  \n"]
     ) == ["plugins/action/thing.py", "foo.yml"]
+
+
+def test_content_index_maps_roles_to_molecule_and_integration_roots(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    graph = build_collection_graph(root)
+    index = build_content_index(root, collection=graph.collection, depth=4)
+
+    assert index.role_to_roots["acme.widgets.agent"] == [
+        "extensions/molecule/thing_mock",
+        "tests/integration/targets/thing_test",
+    ]
+    assert index.role_to_roots["external.vendor.agent"] == [
+        "extensions/molecule/other",
+    ]
+    assert roots_using_roles(index, {"acme.widgets.agent"}) == {
+        "extensions/molecule/thing_mock": ["acme.widgets.agent"],
+        "tests/integration/targets/thing_test": ["acme.widgets.agent"],
+    }
+
+
+def test_content_index_always_scans_roles_and_keeps_them_out_of_plugin_map(
+    tmp_path: Path,
+):
+    root = _mini_collection(tmp_path)
+    graph = build_collection_graph(root)
+    index = build_content_index(
+        root,
+        collection=graph.collection,
+        depth=4,
+        kinds=[PluginKind.FILTER],
+    )
+
+    assert index.role_to_roots["acme.widgets.agent"] == [
+        "extensions/molecule/thing_mock",
+        "tests/integration/targets/thing_test",
+    ]
+    assert not any("agent" in name for name in index.plugin_to_roots)
 
 
 def test_impact_plugin_change_selects_scenarios(tmp_path: Path):
@@ -193,3 +262,190 @@ def test_cli_impact_from_stdin(tmp_path: Path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "molecule\textensions/molecule/thing_mock" in out
     assert "integration\ttests/integration/targets/thing_test" in out
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        "roles/agent/defaults/main.yml",
+        "roles/agent/handlers/main.yml",
+        "roles/agent/meta/main.yml",
+        "roles/agent/tasks/main.yml",
+        "roles/agent/tasks/agent_present.yml",
+        "roles/agent/templates/service.j2",
+        "roles/agent/vars/main.yml",
+        "roles/agent/files/archive.tar.gz",
+    ],
+)
+def test_role_file_selects_molecule_and_integration_roots(
+    tmp_path: Path,
+    changed: str,
+):
+    root = _mini_collection(tmp_path)
+    report = compute_impact(
+        collection_root=root,
+        changed_files=[changed],
+        parent=root,
+    )
+
+    assert report.affected_roles == ["acme.widgets.agent"]
+    assert report.affected_plugins == []
+    assert report.molecule_scenarios == ["extensions/molecule/thing_mock"]
+    assert report.integration_targets == ["tests/integration/targets/thing_test"]
+    expected_reason = f"role:acme.widgets.agent via {changed}"
+    assert report.reasons == {
+        "extensions/molecule/thing_mock": [expected_reason],
+        "tests/integration/targets/thing_test": [expected_reason],
+    }
+
+
+def test_role_change_selects_all_rfe_molecule_scenarios(tmp_path: Path):
+    (tmp_path / "galaxy.yml").write_text(
+        "namespace: community\nname: beszel\n",
+        encoding="utf-8",
+    )
+    for name in ("agent_airgap", "agent_default", "agent_token"):
+        scenario = tmp_path / "extensions" / "molecule" / name
+        scenario.mkdir(parents=True)
+        (scenario / "molecule.yml").write_text(
+            "driver:\n  name: default\n",
+            encoding="utf-8",
+        )
+        (scenario / "converge.yml").write_text(
+            "- hosts: localhost\n  roles:\n    - role: community.beszel.agent\n",
+            encoding="utf-8",
+        )
+
+    report = compute_impact(
+        collection_root=tmp_path,
+        changed_files=["roles/agent/tasks/agent_present.yml"],
+        parent=tmp_path / "extensions",
+    )
+
+    assert report.affected_roles == ["community.beszel.agent"]
+    assert report.molecule_scenarios == [
+        "molecule/agent_airgap",
+        "molecule/agent_default",
+        "molecule/agent_token",
+    ]
+
+
+def test_affected_roles_are_sorted(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    report = compute_impact(
+        collection_root=root,
+        changed_files=[
+            "roles/zebra/tasks/main.yml",
+            "roles/alpha/tasks/main.yml",
+        ],
+        parent=root,
+    )
+
+    assert report.affected_roles == [
+        "acme.widgets.alpha",
+        "acme.widgets.zebra",
+    ]
+
+
+def test_reason_lists_are_deterministic_for_reversed_changed_files(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    changed_files = [
+        "roles/agent/vars/main.yml",
+        "roles/agent/tasks/main.yml",
+    ]
+
+    forward = compute_impact(
+        collection_root=root,
+        changed_files=changed_files,
+        parent=root,
+    )
+    reverse = compute_impact(
+        collection_root=root,
+        changed_files=list(reversed(changed_files)),
+        parent=root,
+    )
+
+    expected_reasons = [
+        "role:acme.widgets.agent via roles/agent/tasks/main.yml",
+        "role:acme.widgets.agent via roles/agent/vars/main.yml",
+    ]
+    assert forward.reasons == reverse.reasons
+    assert forward.reasons == {
+        "extensions/molecule/thing_mock": expected_reasons,
+        "tests/integration/targets/thing_test": expected_reasons,
+    }
+
+
+def test_impact_json_always_contains_affected_roles(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    report = compute_impact(
+        collection_root=root,
+        changed_files=["plugins/module_utils/core.py"],
+        parent=root,
+    )
+
+    payload = json.loads(format_impact_json(report))
+    assert (
+        list(payload).index("affected_roles")
+        == list(payload).index("affected_plugins") + 1
+    )
+    assert payload["affected_roles"] == []
+
+
+def test_unreferenced_local_role_has_no_affected_roots(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    report = compute_impact(
+        collection_root=root,
+        changed_files=["roles/unrelated/tasks/main.yml"],
+        parent=root,
+    )
+
+    assert report.affected_roles == ["acme.widgets.unrelated"]
+    assert report.molecule_scenarios == []
+    assert report.integration_targets == []
+    assert report.reasons == {}
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        "roles/agent",
+        "roles//tasks/main.yml",
+        "other/roles/agent/tasks/main.yml",
+    ],
+)
+def test_malformed_role_path_does_not_affect_roles(
+    tmp_path: Path,
+    changed: str,
+):
+    root = _mini_collection(tmp_path)
+    report = compute_impact(
+        collection_root=root,
+        changed_files=[changed],
+        parent=root,
+    )
+
+    assert report.affected_roles == []
+    assert report.molecule_scenarios == []
+    assert report.integration_targets == []
+    assert report.reasons == {}
+
+
+def test_mixed_plugin_and_role_changes_are_deduplicated(tmp_path: Path):
+    root = _mini_collection(tmp_path)
+    report = compute_impact(
+        collection_root=root,
+        changed_files=[
+            "plugins/module_utils/core.py",
+            "roles/agent/tasks/main.yml",
+        ],
+        parent=root,
+    )
+
+    assert report.affected_plugins == ["acme.widgets.thing"]
+    assert report.affected_roles == ["acme.widgets.agent"]
+    assert report.molecule_scenarios == ["extensions/molecule/thing_mock"]
+    assert report.integration_targets == ["tests/integration/targets/thing_test"]
+    for reasons in report.reasons.values():
+        assert len(reasons) == 2
+        assert len(reasons) == len(set(reasons))

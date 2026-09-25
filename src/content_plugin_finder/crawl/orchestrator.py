@@ -26,6 +26,7 @@ def _scan_directory(
     raw: Path | str,
     kind_set: frozenset[PluginKind],
     registry: CrawlerRegistry,
+    parent: Path | str | None = None,
 ) -> tuple[str, DirectoryReport]:
     root = Path(raw)
     if not root.is_dir():
@@ -34,7 +35,13 @@ def _scan_directory(
     crawlers = registry.for_kinds(kind_set)
     need_acc = any(c.name in {"module", "lookup"} for c in crawlers)
     need_yaml = any(c.name in {"filter", "lookup"} for c in crawlers)
-    ctx = build_context(root, need_acc=need_acc, need_yaml=need_yaml)
+    boundary = Path(parent) if parent is not None else root
+    ctx = build_context(
+        root,
+        need_acc=need_acc,
+        need_yaml=need_yaml,
+        parent=boundary,
+    )
 
     findings: list[Finding] = []
     for crawler in crawlers:
@@ -55,6 +62,8 @@ class Orchestrator:
         directories: Sequence[Path | str],
         kinds: Iterable[PluginKind] | None = None,
         workers: int = 1,
+        *,
+        parent: Path | str | None = None,
     ) -> ScanReport:
         kind_set = frozenset(kinds) if kinds is not None else frozenset(PluginKind)
         if workers < 1:
@@ -63,7 +72,9 @@ class Orchestrator:
         inputs = list(directories)
         report = ScanReport()
         if workers == 1 or len(inputs) <= 1:
-            results = (_scan_directory(raw, kind_set, self.registry) for raw in inputs)
+            results = (
+                _scan_directory(raw, kind_set, self.registry, parent) for raw in inputs
+            )
             for path, directory_report in results:
                 report.directories[path] = directory_report
             return report
@@ -75,6 +86,7 @@ class Orchestrator:
                 inputs,
                 [kind_set] * len(inputs),
                 [self.registry] * len(inputs),
+                [parent] * len(inputs),
             )
             for path, directory_report in results:
                 report.directories[path] = directory_report
@@ -86,6 +98,7 @@ class Orchestrator:
             PluginKind.MODULE: {},
             PluginKind.FILTER: {},
             PluginKind.LOOKUP: {},
+            PluginKind.ROLE: {},
         }
         for finding in findings:
             bucket = buckets[finding.kind]
@@ -105,4 +118,5 @@ class Orchestrator:
             modules=sorted_named(buckets[PluginKind.MODULE]),
             filters=sorted_named(buckets[PluginKind.FILTER]),
             lookups=sorted_named(buckets[PluginKind.LOOKUP]),
+            roles=sorted_named(buckets[PluginKind.ROLE]),
         )

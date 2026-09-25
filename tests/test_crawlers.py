@@ -96,6 +96,82 @@ def test_orchestrator_parallel_scan_preserves_directory_order(tmp_path: Path):
     assert {plugin.name for plugin in report.merged().filters} == {"trim", "upper"}
 
 
+def test_role_crawler_reports_serial_and_parallel_locations(tmp_path: Path):
+    roots = [tmp_path / "one", tmp_path / "two"]
+    for root, role in zip(roots, ("short_role", "vendor.ns.role"), strict=True):
+        root.mkdir()
+        source = root / "converge.yml"
+        source.write_text(
+            f"- hosts: localhost\n  tasks:\n    - include_role: {role}\n",
+            encoding="utf-8",
+        )
+
+    serial = Orchestrator().scan(roots, kinds=[PluginKind.ROLE])
+    parallel = Orchestrator().scan(roots, kinds=[PluginKind.ROLE], workers=2)
+
+    assert [p.name for p in serial.merged().roles] == ["short_role", "vendor.ns.role"]
+    assert serial.to_dict(by_directory=True) == parallel.to_dict(by_directory=True)
+    for root, name in zip(roots, ("short_role", "vendor.ns.role"), strict=True):
+        finding = next(
+            p for p in parallel.directories[str(root.resolve())].roles if p.name == name
+        )
+        assert finding.locations[0].path == str(root / "converge.yml")
+        assert finding.locations[0].source == "yaml-role-reference"
+    assert parallel.to_dict()["all"]["roles"][0]["name"] == "short_role"
+
+
+def test_orchestrator_parent_bounds_shared_role_imports_serial_and_parallel(
+    tmp_path: Path,
+):
+    roots = [tmp_path / "one", tmp_path / "two"]
+    for root in roots:
+        root.mkdir()
+        (root / "converge.yml").write_text(
+            "- import_playbook: ../shared.yml\n", encoding="utf-8"
+        )
+    shared = tmp_path / "shared.yml"
+    shared.write_text(
+        "- hosts: localhost\n  roles:\n    - shared_role\n", encoding="utf-8"
+    )
+
+    default_boundary = Orchestrator().scan(roots, kinds=[PluginKind.ROLE])
+    serial = Orchestrator().scan(roots, kinds=[PluginKind.ROLE], parent=tmp_path)
+    parallel = Orchestrator().scan(
+        roots, kinds=[PluginKind.ROLE], workers=2, parent=tmp_path
+    )
+
+    assert default_boundary.merged().roles == []
+    assert serial.to_dict(by_directory=True) == parallel.to_dict(by_directory=True)
+    for root in roots:
+        role = serial.directories[str(root.resolve())].roles[0]
+        assert role.name == "shared_role"
+        assert role.locations[0].path == str(shared)
+
+
+def test_orchestrator_default_includes_roles_and_filter_only_excludes_them(
+    tmp_path: Path,
+):
+    root = tmp_path / "scenario"
+    root.mkdir()
+    (root / "converge.yml").write_text(
+        "- hosts: localhost\n"
+        "  roles:\n"
+        "    - visible_role\n"
+        "  tasks:\n"
+        "    - debug:\n"
+        '        msg: "{{ value | upper }}"\n',
+        encoding="utf-8",
+    )
+
+    all_kinds = Orchestrator().scan([root])
+    filter_only = Orchestrator().scan([root], kinds=[PluginKind.FILTER])
+
+    assert [role.name for role in all_kinds.merged().roles] == ["visible_role"]
+    assert all_kinds.merged().filters
+    assert filter_only.merged().roles == []
+    assert filter_only.merged().filters
+
+
 def test_orchestrator_library_default_supports_unpickleable_registry(tmp_path: Path):
     class LocalCrawler(Crawler):
         name = "local"

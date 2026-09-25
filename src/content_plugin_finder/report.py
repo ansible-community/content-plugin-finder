@@ -26,6 +26,7 @@ def _format_dir(dir_report: DirectoryReport) -> list[str]:
     lines.extend(_names_lines("module", dir_report.modules))
     lines.extend(_names_lines("filter", dir_report.filters))
     lines.extend(_names_lines("lookup", dir_report.lookups))
+    lines.extend(_names_lines("role", dir_report.roles))
     return lines
 
 

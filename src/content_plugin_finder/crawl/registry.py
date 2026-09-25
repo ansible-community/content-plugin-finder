@@ -42,11 +42,13 @@ def _build_default_registry() -> CrawlerRegistry:
     from content_plugin_finder.crawl.filters import FilterCrawler
     from content_plugin_finder.crawl.lookups import LookupCrawler
     from content_plugin_finder.crawl.modules import ModuleCrawler
+    from content_plugin_finder.crawl.roles import RoleCrawler
 
     registry = CrawlerRegistry()
     registry.register(ModuleCrawler())
     registry.register(FilterCrawler())
     registry.register(LookupCrawler())
+    registry.register(RoleCrawler())
     return registry
 
 

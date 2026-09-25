@@ -22,6 +22,7 @@ class CrawlContext:
     acc_result: Any | None = None
     yaml_scalars: list[YamlScalar] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    parent: Path | None = None
 
 
 def iter_yaml_files(root: Path) -> list[Path]:
@@ -94,6 +95,7 @@ def build_context(
     *,
     need_acc: bool = True,
     need_yaml: bool = True,
+    parent: Path | None = None,
 ) -> CrawlContext:
     root = root.resolve()
     errors: list[str] = []
@@ -112,4 +114,5 @@ def build_context(
         acc_result=acc_result,
         yaml_scalars=yaml_scalars,
         errors=errors,
+        parent=(parent or root).resolve(),
     )

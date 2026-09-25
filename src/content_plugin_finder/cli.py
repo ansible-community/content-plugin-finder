@@ -161,7 +161,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--types",
         type=_parse_kinds,
         default=None,
-        help="Comma-separated plugin kinds: module,filter,lookup",
+        help="Comma-separated kinds: module,filter,lookup,role",
     )
     parser.add_argument(
         "--workers",
@@ -304,6 +304,7 @@ def main(argv: list[str] | None = None) -> int:
             directories,
             kinds=args.types,
             workers=args.workers,
+            parent=args.parent,
         )
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
