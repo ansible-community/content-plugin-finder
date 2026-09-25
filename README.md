@@ -7,19 +7,28 @@
 
 Find Ansible **modules**, **filters**, and **lookups** used in directories such as Molecule scenarios or ansible-test integration targets, and map git changes to molecule scenarios / ansible-test integration targets that should run.
 
-Uses a pluggable **crawler subsystem**. v1 ships three crawlers; more plugin kinds can be added later without changing the orchestrator.
-
-License: **MIT** (see [LICENSE](LICENSE)).
-
-This project vendors [ansible-content-capture](https://github.com/ansible/ansible-content-capture) (Apache-2.0) under `src/ansible_content_capture/`. See [LICENSE.ansible-content-capture](LICENSE.ansible-content-capture) and [NOTICE](NOTICE).
-
-Vendored note: `loader.get_scanner_version()` was patched to use `importlib.metadata` instead of removed `pkg_resources` (setuptools ≥83).
+Uses a pluggable [**crawler subsystem**](#crawler-subsystem).
 
 ![Impact view: changed file → plugin FQCNs → molecule scenarios and integration targets](docs/images/visualizer-impact.png)
 
-## Install
+## Vendored [ansible-content-capture](https://github.com/ansible/ansible-content-capture)
+
+This project vendors [ansible-content-capture](https://github.com/ansible/ansible-content-capture) (Apache-2.0) under `src/ansible_content_capture/`. See [LICENSE.ansible-content-capture](LICENSE.ansible-content-capture) and [NOTICE](NOTICE).
+
+The following modifications have been made to [ansible-content-capture](https://github.com/ansible/ansible-content-capture):
+
+- `loader.get_scanner_version()` was patched to use `importlib.metadata` instead of removed `pkg_resources` (setuptools ≥83).
+- `finder._get_body_data()` caches YAML file reads with `lru_cache` (keyed on path, mtime, and size) to avoid re-parsing the same file on repeated format checks.
+- `model_loader.load_taskfile()` splits YAML lines once and passes the pre-split list to each `load_task()` call instead of re-splitting per task.
+- `model_loader.load_collection()` propagates `skip_task_format_error` through to `load_taskfile()` so strict-error settings are honoured during collection loading.
+- `parser.Parser` accepts a pre-loaded `ScanData` object to skip a redundant preliminary scan when the caller already holds one.
+
+## Installation
 
 ```bash
+# PyPI
+uv pip install content-plugin-finder
+# Development
 pip install -e ".[dev]"
 ```
 
@@ -55,10 +64,10 @@ xdg-open viz/index.html   # or open viz/index.html in your browser
 4. **Plugin dependencies**: pick a **Focus plugin** FQCN (recommended). Click a node for path + owning plugins.
 5. **Impact**: explore changed files → plugins → molecule / integration roots. Counts appear in the toolbar.
 
-| Mode | JSON source | View |
-|------|-------------|------|
+| Mode                | JSON source                                                  | View                                                                 |
+| ------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------- |
 | Plugin dependencies | `--collection-graph --format json` (full or `--plugin FQCN`) | Focus one FQCN (recommended) or capped “All”; nodes are Python files |
-| Impact | `--impact --format json` | Changed files → plugin FQCNs → molecule / integration roots |
+| Impact              | `--impact --format json`                                     | Changed files → plugin FQCNs → molecule / integration roots          |
 
 No npm build. The file picker works with `file://` (browsers block `fetch` of local paths).
 
@@ -73,6 +82,7 @@ content-plugin-finder --list-crawlers
 # Discover Molecule scenarios + integration targets under a collection/repo
 content-plugin-finder --parent ../ansible.platform --depth 4 --list-roots
 content-plugin-finder --parent ../ansible.platform --depth 4
+content-plugin-finder --parent ../ansible.platform --workers 8
 ```
 
 `--parent` walks for:
@@ -84,12 +94,17 @@ content-plugin-finder --parent ../ansible.platform --depth 4
 For a collection root, depth `3` reaches `extensions/molecule/<scenario>`;
 depth `4` also reaches `tests/integration/targets/<target>`.
 
+CLI directory scans use up to four processes by default. Use `--workers N` to tune
+the parallelism for the available CPU and memory, or `--workers 1` for serial
+execution. Library calls through `Orchestrator.scan()` remain serial unless
+`workers` is explicitly set.
+
 ## Crawler subsystem
 
-| Crawler | Kind | Source |
-|---------|------|--------|
-| `module` | module | ansible-content-capture task/module trees |
-| `filter` | filter | Jinja pipes in YAML scalars |
+| Crawler  | Kind   | Source                                                |
+| -------- | ------ | ----------------------------------------------------- |
+| `module` | module | ansible-content-capture task/module trees             |
+| `filter` | filter | Jinja pipes in YAML scalars                           |
 | `lookup` | lookup | ACC lookup/query tasks + Jinja `lookup()` / `query()` |
 
 Modules and action plugins are reported together as modules (not distinguishable from content alone).
@@ -112,12 +127,12 @@ Plugin identity is always the **FQCN** `{namespace}.{name}.{plugin}` from `galax
 plus the short plugin name (e.g. `ansible.platform.application`).
 `--plugin application` is accepted as a short alias and resolved to that FQCN.
 
-| Kind | Short name source (then prefixed with collection FQCN) |
-|------|--------------------------------------------------------|
-| module | `DOCUMENTATION` `module:` / file stem |
+| Kind   | Short name source (then prefixed with collection FQCN)                           |
+| ------ | -------------------------------------------------------------------------------- |
+| module | `DOCUMENTATION` `module:` / file stem                                            |
 | action | `ActionModule.MODULE_NAME`, else matching `plugins/modules/<stem>.py`, else stem |
-| filter | keys from `FilterModule.filters()` (one file may expose many filters) |
-| lookup | `DOCUMENTATION` `name:` / file stem |
+| filter | keys from `FilterModule.filters()` (one file may expose many filters)            |
+| lookup | `DOCUMENTATION` `name:` / file stem                                              |
 
 ## Impact (git changes → tests to run)
 
@@ -307,3 +322,7 @@ print(impact.integration_targets)
 print(impact.affected_plugins)
 print(impact.affected_roles)
 ```
+
+## LICENSE
+
+**MIT** (see [LICENSE](LICENSE)).

@@ -5,7 +5,10 @@ import pytest
 
 from content_plugin_finder.cli import main
 from content_plugin_finder.collection.graph import build_collection_graph
-from content_plugin_finder.impact.content_index import build_content_index, roots_using_roles
+from content_plugin_finder.impact.content_index import (
+    build_content_index,
+    roots_using_roles,
+)
 from content_plugin_finder.impact.engine import (
     compute_impact,
     format_impact_json,
@@ -74,8 +77,7 @@ def _mini_collection(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (target / "tasks" / "role.yml").write_text(
-        "- ansible.builtin.include_role:\n"
-        "    name: agent\n",
+        "- ansible.builtin.include_role:\n    name: agent\n",
         encoding="utf-8",
     )
 
@@ -192,9 +194,7 @@ def test_impact_shared_molecule_selects_all_scenarios(tmp_path: Path):
     }
     assert report.integration_targets == []
     for root_rel in report.molecule_scenarios:
-        assert any(
-            r.endswith("(shared molecule)") for r in report.reasons[root_rel]
-        )
+        assert any(r.endswith("(shared molecule)") for r in report.reasons[root_rel])
 
 
 def test_impact_scenario_local_still_only_that_scenario(tmp_path: Path):
@@ -292,9 +292,7 @@ def test_role_change_selects_all_rfe_molecule_scenarios(tmp_path: Path):
             encoding="utf-8",
         )
         (scenario / "converge.yml").write_text(
-            "- hosts: localhost\n"
-            "  roles:\n"
-            "    - role: community.beszel.agent\n",
+            "- hosts: localhost\n  roles:\n    - role: community.beszel.agent\n",
             encoding="utf-8",
         )
 
@@ -367,7 +365,10 @@ def test_impact_json_always_contains_affected_roles(tmp_path: Path):
     )
 
     payload = json.loads(format_impact_json(report))
-    assert list(payload).index("affected_roles") == list(payload).index("affected_plugins") + 1
+    assert (
+        list(payload).index("affected_roles")
+        == list(payload).index("affected_plugins") + 1
+    )
     assert payload["affected_roles"] == []
 
 

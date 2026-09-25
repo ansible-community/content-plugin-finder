@@ -10,7 +10,7 @@ from content_plugin_finder.collection.graph import (
     format_collection_graph_text,
     format_resolution_json,
 )
-from content_plugin_finder.crawl.orchestrator import Orchestrator
+from content_plugin_finder.crawl.orchestrator import Orchestrator, default_workers
 from content_plugin_finder.crawl.registry import default_registry
 from content_plugin_finder.discover import discover_scan_roots
 from content_plugin_finder.impact.engine import (
@@ -18,7 +18,10 @@ from content_plugin_finder.impact.engine import (
     format_impact_json,
     format_impact_text,
 )
-from content_plugin_finder.impact.git import list_changed_files, read_changed_files_from_lines
+from content_plugin_finder.impact.git import (
+    list_changed_files,
+    read_changed_files_from_lines,
+)
 from content_plugin_finder.models import PluginKind
 from content_plugin_finder.report import format_json, format_text
 
@@ -39,6 +42,16 @@ def _parse_kinds(value: str) -> list[PluginKind]:
     if not kinds:
         raise argparse.ArgumentTypeError("at least one plugin type is required")
     return kinds
+
+
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be >= 1")
+    return parsed
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -151,6 +164,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated plugin kinds: module,filter,lookup",
     )
     parser.add_argument(
+        "--workers",
+        type=_positive_int,
+        default=default_workers(),
+        help="Parallel scan processes (default: up to 4)",
+    )
+    parser.add_argument(
         "--list-crawlers",
         action="store_true",
         help="List registered crawlers and exit",
@@ -223,6 +242,7 @@ def _run_impact(args: argparse.Namespace) -> int:
             changed_files=changed,
             parent=parent,
             depth=args.depth,
+            workers=args.workers,
         )
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
@@ -280,7 +300,11 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     try:
-        report = Orchestrator().scan(directories, kinds=args.types)
+        report = Orchestrator().scan(
+            directories,
+            kinds=args.types,
+            workers=args.workers,
+        )
     except FileNotFoundError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

@@ -17,23 +17,25 @@ from content_plugin_finder.impact.role_index import roles_used_by_root
             {"acme.widgets.agent"},
         ),
         (
-            "- hosts: localhost\n  tasks:\n"
-            "    - include_role:\n        name: agent\n",
+            "- hosts: localhost\n  tasks:\n    - include_role:\n        name: agent\n",
             {"acme.widgets.agent"},
         ),
         (
-            "- hosts: localhost\n  tasks:\n"
-            "    - ansible.builtin.include_role: agent\n",
+            "- hosts: localhost\n  tasks:\n    - ansible.builtin.include_role: agent\n",
             {"acme.widgets.agent"},
         ),
         (
-            "- hosts: localhost\n  tasks:\n"
-            "    - import_role:\n        name: acme.widgets.agent\n",
+            (
+                "- hosts: localhost\n  tasks:\n"
+                "    - import_role:\n        name: acme.widgets.agent\n"
+            ),
             {"acme.widgets.agent"},
         ),
         (
-            "- hosts: localhost\n  tasks:\n"
-            "    - ansible.builtin.import_role: external.vendor.agent\n",
+            (
+                "- hosts: localhost\n  tasks:\n"
+                "    - ansible.builtin.import_role: external.vendor.agent\n"
+            ),
             {"external.vendor.agent"},
         ),
     ],
@@ -47,11 +49,14 @@ def test_roles_used_by_root_extracts_supported_syntax(
     root.mkdir(parents=True)
     (root / "converge.yml").write_text(content, encoding="utf-8")
 
-    assert roles_used_by_root(
-        root,
-        parent=tmp_path,
-        collection="acme.widgets",
-    ) == expected
+    assert (
+        roles_used_by_root(
+            root,
+            parent=tmp_path,
+            collection="acme.widgets",
+        )
+        == expected
+    )
 
 
 def test_roles_used_by_root_follows_static_imports_once(tmp_path: Path):
@@ -65,14 +70,11 @@ def test_roles_used_by_root_follows_static_imports_once(tmp_path: Path):
         encoding="utf-8",
     )
     (shared / "playbook.yml").write_text(
-        "- hosts: localhost\n"
-        "  tasks:\n"
-        "    - import_tasks: tasks/roles.yml\n",
+        "- hosts: localhost\n  tasks:\n    - import_tasks: tasks/roles.yml\n",
         encoding="utf-8",
     )
     (tasks / "roles.yml").write_text(
-        "- include_role:\n    name: agent\n"
-        "- import_tasks: ../playbook.yml\n",
+        "- include_role:\n    name: agent\n- import_tasks: ../playbook.yml\n",
         encoding="utf-8",
     )
 

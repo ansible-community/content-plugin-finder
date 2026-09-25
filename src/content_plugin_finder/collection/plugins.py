@@ -50,14 +50,20 @@ def iter_plugin_python_files(collection_root: Path) -> list[tuple[str, Path]]:
         if not kind_dir.is_dir():
             continue
         for path in sorted(kind_dir.rglob("*.py")):
-            if path.name == "__init__.py" and path.parent == kind_dir and kind != "module_utils":
+            if (
+                path.name == "__init__.py"
+                and path.parent == kind_dir
+                and kind != "module_utils"
+            ):
                 # Keep nested package __init__ under module_utils/plugin_utils; skip empty top-level ones later
                 pass
             found.append((kind, path))
     return found
 
 
-def extract_documentation_name(source: str, *, prefer_module_key: bool = False) -> str | None:
+def extract_documentation_name(
+    source: str, *, prefer_module_key: bool = False
+) -> str | None:
     match = _DOC_NAME_RE.search(source)
     if not match:
         return None
@@ -76,10 +82,15 @@ def has_toplevel_action_module(source: str) -> bool:
         tree = ast.parse(source)
     except SyntaxError:
         return False
-    return any(isinstance(node, ast.ClassDef) and node.name == "ActionModule" for node in tree.body)
+    return any(
+        isinstance(node, ast.ClassDef) and node.name == "ActionModule"
+        for node in tree.body
+    )
 
 
-def extract_action_module_name(source: str, stem: str, module_stems: set[str]) -> str | None:
+def extract_action_module_name(
+    source: str, stem: str, module_stems: set[str]
+) -> str | None:
     """Resolve the module name an action plugin serves.
 
     Returns ``None`` when the file is not a real action plugin (no top-level
@@ -120,9 +131,13 @@ def _ast_action_module_name(source: str) -> str | None:
             if not isinstance(stmt, ast.Assign):
                 continue
             for target in stmt.targets:
-                if isinstance(target, ast.Name) and target.id == "MODULE_NAME":
-                    if isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
-                        return stmt.value.value
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id == "MODULE_NAME"
+                    and isinstance(stmt.value, ast.Constant)
+                    and isinstance(stmt.value.value, str)
+                ):
+                    return stmt.value.value
     return None
 
 
@@ -172,7 +187,11 @@ def _dict_string_keys(node: ast.AST) -> list[str]:
         for key in node.keys:
             if isinstance(key, ast.Constant) and isinstance(key.value, str):
                 keys.append(key.value)
-    elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "dict":
+    elif (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "dict"
+    ):
         for kw in node.keywords:
             if kw.arg:
                 keys.append(kw.arg)

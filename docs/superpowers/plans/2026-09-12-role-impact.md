@@ -75,13 +75,11 @@ from content_plugin_finder.impact.role_index import roles_used_by_root
             {"acme.widgets.agent"},
         ),
         (
-            "- hosts: localhost\n  tasks:\n"
-            "    - include_role:\n        name: agent\n",
+            "- hosts: localhost\n  tasks:\n    - include_role:\n        name: agent\n",
             {"acme.widgets.agent"},
         ),
         (
-            "- hosts: localhost\n  tasks:\n"
-            "    - ansible.builtin.include_role: agent\n",
+            "- hosts: localhost\n  tasks:\n    - ansible.builtin.include_role: agent\n",
             {"acme.widgets.agent"},
         ),
         (
@@ -105,11 +103,14 @@ def test_roles_used_by_root_extracts_supported_syntax(
     root.mkdir(parents=True)
     (root / "converge.yml").write_text(content, encoding="utf-8")
 
-    assert roles_used_by_root(
-        root,
-        parent=tmp_path,
-        collection="acme.widgets",
-    ) == expected
+    assert (
+        roles_used_by_root(
+            root,
+            parent=tmp_path,
+            collection="acme.widgets",
+        )
+        == expected
+    )
 ```
 
 - [ ] **Step 2: Run the direct-syntax tests and verify the missing module failure**
@@ -138,14 +139,11 @@ def test_roles_used_by_root_follows_static_imports_once(tmp_path: Path):
         encoding="utf-8",
     )
     (shared / "playbook.yml").write_text(
-        "- hosts: localhost\n"
-        "  tasks:\n"
-        "    - import_tasks: tasks/roles.yml\n",
+        "- hosts: localhost\n  tasks:\n    - import_tasks: tasks/roles.yml\n",
         encoding="utf-8",
     )
     (tasks / "roles.yml").write_text(
-        "- include_role:\n    name: agent\n"
-        "- import_tasks: ../playbook.yml\n",
+        "- include_role:\n    name: agent\n- import_tasks: ../playbook.yml\n",
         encoding="utf-8",
     )
 
@@ -412,16 +410,14 @@ Change `thing_mock/converge.yml` to include a play-level role before its existin
 Make `thing_test/tasks/main.yml` statically import a task file that uses `include_role`. This proves integration-root import traversal, rather than only direct role extraction:
 
 ```python
-    (target / "tasks" / "main.yml").write_text(
-        "- acme.widgets.thing:\n    name: y\n"
-        "- ansible.builtin.import_tasks: role.yml\n",
-        encoding="utf-8",
-    )
-    (target / "tasks" / "role.yml").write_text(
-        "- ansible.builtin.include_role:\n"
-        "    name: agent\n",
-        encoding="utf-8",
-    )
+(target / "tasks" / "main.yml").write_text(
+    "- acme.widgets.thing:\n    name: y\n- ansible.builtin.import_tasks: role.yml\n",
+    encoding="utf-8",
+)
+(target / "tasks" / "role.yml").write_text(
+    "- ansible.builtin.include_role:\n    name: agent\n",
+    encoding="utf-8",
+)
 ```
 
 Change the unrelated Molecule scenario so it references an external role with the same leaf name. This proves local `acme.widgets.agent` changes do not match `external.vendor.agent`:
@@ -626,9 +622,7 @@ def test_role_change_selects_all_rfe_molecule_scenarios(tmp_path: Path):
             encoding="utf-8",
         )
         (scenario / "converge.yml").write_text(
-            "- hosts: localhost\n"
-            "  roles:\n"
-            "    - role: community.beszel.agent\n",
+            "- hosts: localhost\n  roles:\n    - role: community.beszel.agent\n",
             encoding="utf-8",
         )
 
@@ -680,7 +674,10 @@ def test_impact_json_always_contains_affected_roles(tmp_path: Path):
     )
 
     payload = json.loads(format_impact_json(report))
-    assert list(payload).index("affected_roles") == list(payload).index("affected_plugins") + 1
+    assert (
+        list(payload).index("affected_roles")
+        == list(payload).index("affected_plugins") + 1
+    )
     assert payload["affected_roles"] == []
 
 
@@ -819,7 +816,7 @@ Inside the changed-file loop, after plugin matching, add:
 
 Populate the report with sorted roles:
 
-```python
+```text
         affected_plugins=sorted(affected_plugins),
         affected_roles=sorted(affected_roles),
         molecule_scenarios=molecule,
