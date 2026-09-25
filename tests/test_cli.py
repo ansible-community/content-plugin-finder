@@ -14,6 +14,7 @@ def test_list_crawlers(capsys):
     assert "module" in out
     assert "filter" in out
     assert "lookup" in out
+    assert "role" in out
 
 
 def test_cli_text_scan(capsys):
@@ -28,6 +29,20 @@ def test_cli_json_scan(capsys):
     out = capsys.readouterr().out
     payload = json.loads(out)
     assert payload["all"]["filters"][0]["name"] == "default"
+
+
+def test_cli_role_only_scan_reports_raw_names_and_location(tmp_path: Path, capsys):
+    source = tmp_path / "playbook.yml"
+    source.write_text(
+        "- hosts: localhost\n  roles:\n    - short_role\n    - vendor.ns.role\n",
+        encoding="utf-8",
+    )
+    assert main([str(tmp_path), "--types", "role", "--format", "json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    roles = payload["all"]["roles"]
+    assert [role["name"] for role in roles] == ["short_role", "vendor.ns.role"]
+    assert roles[0]["locations"][0]["path"] == str(source)
+    assert payload["all"]["modules"] == []
 
 
 def test_cli_json_routes_scanner_warnings_to_stderr(monkeypatch, capfd):
@@ -89,6 +104,18 @@ def test_cli_parent_scan(tmp_path: Path, capsys):
     )
     out = capsys.readouterr().out
     assert "filter: default" in out
+
+
+def test_cli_parent_is_import_boundary_for_role_crawler(tmp_path: Path, capsys):
+    mol = tmp_path / "molecule" / "default"
+    mol.mkdir(parents=True)
+    (mol / "molecule.yml").write_text("driver:\n  name: default\n")
+    (mol / "converge.yml").write_text("- import_playbook: ../../shared.yml\n")
+    (tmp_path / "shared.yml").write_text(
+        "- hosts: localhost\n  roles:\n    - from_parent\n", encoding="utf-8"
+    )
+    assert main(["--parent", str(tmp_path), "--types", "role"]) == 0
+    assert "role: from_parent" in capsys.readouterr().out
 
 
 def test_cli_rejects_invalid_workers():

@@ -15,6 +15,7 @@ from content_plugin_finder.impact.engine import (
     format_impact_text,
 )
 from content_plugin_finder.impact.git import read_changed_files_from_lines
+from content_plugin_finder.models import PluginKind
 
 
 def _mini_collection(tmp_path: Path) -> Path:
@@ -119,6 +120,25 @@ def test_content_index_maps_roles_to_molecule_and_integration_roots(tmp_path: Pa
         "extensions/molecule/thing_mock": ["acme.widgets.agent"],
         "tests/integration/targets/thing_test": ["acme.widgets.agent"],
     }
+
+
+def test_content_index_always_scans_roles_and_keeps_them_out_of_plugin_map(
+    tmp_path: Path,
+):
+    root = _mini_collection(tmp_path)
+    graph = build_collection_graph(root)
+    index = build_content_index(
+        root,
+        collection=graph.collection,
+        depth=4,
+        kinds=[PluginKind.FILTER],
+    )
+
+    assert index.role_to_roots["acme.widgets.agent"] == [
+        "extensions/molecule/thing_mock",
+        "tests/integration/targets/thing_test",
+    ]
+    assert not any("agent" in name for name in index.plugin_to_roots)
 
 
 def test_impact_plugin_change_selects_scenarios(tmp_path: Path):

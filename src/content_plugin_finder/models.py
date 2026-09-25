@@ -10,6 +10,7 @@ class PluginKind(StrEnum):
     MODULE = "module"
     FILTER = "filter"
     LOOKUP = "lookup"
+    ROLE = "role"
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,12 +56,14 @@ class DirectoryReport:
     modules: list[NamedPlugin] = field(default_factory=list)
     filters: list[NamedPlugin] = field(default_factory=list)
     lookups: list[NamedPlugin] = field(default_factory=list)
+    roles: list[NamedPlugin] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "modules": [p.to_dict() for p in self.modules],
             "filters": [p.to_dict() for p in self.filters],
             "lookups": [p.to_dict() for p in self.lookups],
+            "roles": [p.to_dict() for p in self.roles],
         }
 
 
@@ -73,12 +76,14 @@ class ScanReport:
             PluginKind.MODULE: {},
             PluginKind.FILTER: {},
             PluginKind.LOOKUP: {},
+            PluginKind.ROLE: {},
         }
         for dir_report in self.directories.values():
             for kind, plugins in (
                 (PluginKind.MODULE, dir_report.modules),
                 (PluginKind.FILTER, dir_report.filters),
                 (PluginKind.LOOKUP, dir_report.lookups),
+                (PluginKind.ROLE, dir_report.roles),
             ):
                 for plugin in plugins:
                     existing = by_kind[kind].get(plugin.name)
@@ -98,6 +103,7 @@ class ScanReport:
             modules=sorted_plugins(by_kind[PluginKind.MODULE]),
             filters=sorted_plugins(by_kind[PluginKind.FILTER]),
             lookups=sorted_plugins(by_kind[PluginKind.LOOKUP]),
+            roles=sorted_plugins(by_kind[PluginKind.ROLE]),
         )
 
     def to_dict(self, by_directory: bool = False) -> dict[str, Any]:
@@ -107,6 +113,7 @@ class ScanReport:
                 "modules": [p.to_dict() for p in merged.modules],
                 "filters": [p.to_dict() for p in merged.filters],
                 "lookups": [p.to_dict() for p in merged.lookups],
+                "roles": [p.to_dict() for p in merged.roles],
             }
         }
         if by_directory:

@@ -6,7 +6,6 @@ from pathlib import Path
 
 from content_plugin_finder.crawl.orchestrator import Orchestrator, default_workers
 from content_plugin_finder.discover import discover_scan_roots
-from content_plugin_finder.impact.role_index import roles_used_by_root
 from content_plugin_finder.models import PluginKind
 
 
@@ -53,7 +52,10 @@ def build_content_index(
     parent = parent.resolve()
     scan_roots = discover_scan_roots(parent, depth)
     report = Orchestrator().scan(
-        scan_roots, kinds=kinds or list(PluginKind), workers=workers
+        scan_roots,
+        kinds=set(kinds or list(PluginKind)) | {PluginKind.ROLE},
+        workers=workers,
+        parent=parent,
     )
 
     index = ContentIndex(collection=collection)
@@ -70,11 +72,9 @@ def build_content_index(
         kind = classify_root(root, parent)
         index.root_kinds[rel] = kind
         if kind in {"molecule", "integration"}:
-            for role in roles_used_by_root(
-                root,
-                parent=parent,
-                collection=collection,
-            ):
+            for found_role in dir_report.roles:
+                name = found_role.name
+                role = name if "." in name else f"{collection}.{name}"
                 role_to_roots[role].add(rel)
 
         names: list[str] = []

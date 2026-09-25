@@ -5,7 +5,7 @@
 > There is no support commitment, stability guarantee, or production readiness
 > claim. Use at your own risk.
 
-Find Ansible **modules**, **filters**, and **lookups** used in directories such as Molecule scenarios or ansible-test integration targets, and map git changes to molecule scenarios / ansible-test integration targets that should run.
+Find Ansible **modules**, **filters**, **lookups**, and **roles** used in directories such as Molecule scenarios or ansible-test integration targets, and map git changes to molecule scenarios / ansible-test integration targets that should run.
 
 Uses a pluggable [**crawler subsystem**](#crawler-subsystem).
 
@@ -77,6 +77,7 @@ No npm build. The file picker works with `file://` (browsers block `fetch` of lo
 content-plugin-finder path/to/scenario [path/to/target ...]
 content-plugin-finder --format json --by-directory path/to/scenario
 content-plugin-finder --types module,filter path/to/scenario
+content-plugin-finder --types role path/to/scenario
 content-plugin-finder --list-crawlers
 
 # Discover Molecule scenarios + integration targets under a collection/repo
@@ -98,6 +99,9 @@ CLI directory scans use up to four processes by default. Use `--workers N` to tu
 the parallelism for the available CPU and memory, or `--workers 1` for serial
 execution. Library calls through `Orchestrator.scan()` remain serial unless
 `workers` is explicitly set.
+When role references are scanned, imports stay inside each scan root by default.
+Passing `--parent` lets role imports follow static YAML paths elsewhere below that
+parent directory.
 
 ## Crawler subsystem
 
@@ -106,6 +110,7 @@ execution. Library calls through `Orchestrator.scan()` remain serial unless
 | `module` | module | ansible-content-capture task/module trees             |
 | `filter` | filter | Jinja pipes in YAML scalars                           |
 | `lookup` | lookup | ACC lookup/query tasks + Jinja `lookup()` / `query()` |
+| `role`   | role   | Play roles and include/import role actions in YAML    |
 
 Modules and action plugins are reported together as modules (not distinguishable from content alone).
 
@@ -204,9 +209,11 @@ A changed path below `roles/<role_name>/` affects the local role
 target that references that role is selected. The match is conservative: any
 file owned by the role selects every root that uses the role.
 
-Role indexing supports string and mapping entries under play-level `roles:`,
+Role crawling supports string and mapping entries under play-level `roles:`,
 plus short and `ansible.builtin` forms of `include_role` and `import_role`.
-Short role names resolve against the local collection. Literal
+Crawler output keeps the role name as written. Impact indexing prefixes short
+names with the local collection FQCN (for example, `agent` becomes
+`acme.widgets.agent`). Literal
 `import_playbook`, `import_tasks`, and `include_tasks` paths are followed while
 they remain below `--parent`; dynamic Jinja import paths are not evaluated.
 
