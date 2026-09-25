@@ -1,4 +1,4 @@
-# content-plugin-finder
+# content-plugin-finder: Ansible modules, filters, lookups, and roles
 
 > **Unsupported prototype.** This repository is an early experiment under
 > active development. APIs, CLI flags, and behavior may change without notice.
@@ -62,12 +62,12 @@ xdg-open viz/index.html   # or open viz/index.html in your browser
 2. Click **Choose File** / **Load JSON** and select `graph.json` or `impact.json`.
 3. Mode is auto-detected from the JSON shape; you can override with the **Mode** control.
 4. **Plugin dependencies**: pick a **Focus plugin** FQCN (recommended). Click a node for path + owning plugins.
-5. **Impact**: explore changed files → plugins → molecule / integration roots. Counts appear in the toolbar.
+5. **Impact**: explore changed files → plugins or roles → molecule / integration roots. Counts appear in the toolbar.
 
 | Mode                | JSON source                                                  | View                                                                 |
 | ------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------- |
 | Plugin dependencies | `--collection-graph --format json` (full or `--plugin FQCN`) | Focus one FQCN (recommended) or capped “All”; nodes are Python files |
-| Impact              | `--impact --format json`                                     | Changed files → plugin FQCNs → molecule / integration roots          |
+| Impact              | `--impact --format json`                                     | Changed files → plugin or role FQCNs → molecule / integration roots |
 
 No npm build. The file picker works with `file://` (browsers block `fetch` of local paths).
 
@@ -113,6 +113,15 @@ parent directory.
 | `role`   | role   | Play roles and include/import role actions in YAML    |
 
 Modules and action plugins are reported together as modules (not distinguishable from content alone).
+
+The registered `RoleCrawler` runs through the same orchestrator as the other
+crawlers and is included in default scans. Use `--types role` to scan only roles,
+or combine it with other kinds, such as `--types module,role`.
+
+Role findings appear as `role: <name>` in text output and in the `roles` array
+of merged and per-directory JSON reports. They retain short or fully qualified
+names and include the source YAML file path. Impact analysis consumes these
+findings to build its role-to-scenario/target index.
 
 ## Collection import graph
 
